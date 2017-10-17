@@ -29,7 +29,7 @@ app.use(function(req, res, next) {
 })
 
 // Allows to serve the contents of this folder
-app.use(express.static('.'))
+app.use(express.static('/home/fmarotta/sox_web'))
 
 // Allow post requests
 app.use(bodyParser.urlencoded({extended: false}))
