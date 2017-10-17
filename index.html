@@ -8,7 +8,7 @@
   <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.2.1/jquery.min.js"></script>
   <script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/js/bootstrap.min.js"></script>
   <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.2.1/jquery.min.js"></script>
-  <script type="text/javascript" src="callSox.js"></script>
+  <script type="text/javascript" src="./js/soxWeb.js"></script>
   <style>
     /* Set height of the grid so .sidenav can be 100% (adjust if needed) */
     .row.content {height: 1500px}
@@ -40,10 +40,10 @@
 
 <div class="container-fluid">
   <div class="row content">
-    <div class="col-sm-3 sidenav">
+    <div class="col-sm-4 sidenav">
       <h3>My Songs</h3>
-	  <span>Path: music</span><span id="location"></span>
-      <ul class="nav nav-pills nav-stacked" id="songs">
+	  <span>Path: music</span><span id="locationBar"></span>
+      <ul class="nav nav-pills nav-stacked" id="songsPanel">
       </ul><br>
       <div class="input-group">
         <input type="text" class="form-control" placeholder="Search Song...">
@@ -55,10 +55,13 @@
       </div>
     </div>
 
-    <div class="col-sm-9">
+    <div class="col-sm-8">
       <h4><small>Song Status</small></h4>
       <hr>
-      <div id="songStatus">
+      <div id="statusPanel">
+		  <div id="message"></div>
+		  <div id="progress"></div>
+		  <div id="actions"></div>
       </div>
     </div>
   </div>
