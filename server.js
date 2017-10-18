@@ -4,22 +4,25 @@
 // appropriate commands
 
 // Modules
-const exec = require('child_process').exec
-const express = require('/usr/lib/node_modules/express')
 const bodyParser = require('/usr/lib/node_modules/body-parser')
+const child_process = require('child_process')
+const express = require('/usr/lib/node_modules/express')
 const fs = require('fs')
+const terminate = require('/usr/lib/node_modules/terminate')
 
 // Config
 // TODO: config file
-const baseMusicPath = '/mnt/media/music'
+const baseMusicPath = '/home/fmarotta/Music'
 const port = 3001
 
 // Initializations
 const app = express();
-
 const server = app.listen(port, function() {
 	console.log("Server listening on port "+port)
 })
+
+// the process of the song being played
+var running = null
 
 // Allows cross-origin requests
 app.use(function(req, res, next) {
@@ -28,8 +31,8 @@ app.use(function(req, res, next) {
 	next();
 })
 
-// Allows to serve the contents of this folder
-app.use(express.static('/home/fmarotta/sox_web'))
+// Allows to serve the contents of this directory
+app.use(express.static(__dirname))
 
 // Allow post requests
 app.use(bodyParser.urlencoded({extended: false}))
@@ -38,7 +41,7 @@ app.use(bodyParser.json())
 // Router {{{
 app.post('/music', function(req, res) {
 	var path = baseMusicPath+req.body.path
-	var response = new Object()
+	var response = {type: '', body: '', message: '', volume: ''}
 
 	fs.lstat(path, function(err, stats) {
 		if (err)
@@ -51,23 +54,45 @@ app.post('/music', function(req, res) {
 				res.json(JSON.stringify(response))
 			})
 		}else if (stats.isFile()) {
-			response.type = 'f'
-			var soxi = exec('soxi '+path, function(error, stdout, stderr) {
+			if (running) {
+				console.log(running)
+				terminate(running, function(err) {
+					if (err)
+						console.log(err)
+				})
+				setTimeout(function() {}, 1000)
+			}
+
+			var soxi = child_process.exec('soxi "'+path+'"', function(error, stdout, stderr) {
 				if (error)
 					console.log('exec error: ' + error)
+				response.type = 'f'
 				response.message = stdout.replace(/\n/g, '<br/>')
-				res.send(JSON.stringify(response))
-			})
-			var kill = exec('kill `pgrep play`', function (error, stdout, stderr) {
-				// There is an error if nothing is running
-				if (error)
-					//console.log('exec error: ' + error)
-				var play = exec('play -q '+path, function(error, stdout, stderr) {
+				var volume = child_process.exec('pactl list sinks | grep "Volume: front-left:" | awk \'{print ($3+$10)*100/131070}\'', function(error, stdout, stderr) {
 					if (error)
 						console.log('exec error: ' + error)
+					response.volume = stdout
+					res.json(JSON.stringify(response))
 				})
 			})
+			var play = child_process.exec('play -q "'+path+'"', function(error, stdout, stderr) {
+				if (error) {
+					console.log('exec error: ' + error)
+					running = null
+				}
+			})
+			play.on('exit', function(code) {
+				running = null
+			})
+			running = play.pid
 		}
+	})
+})
+
+app.post('/volume', function(req, res) {
+	var sinkvol = child_process.exec('pactl set-sink-volume @DEFAULT_SINK@ '+req.body.vol+'%', function(error, stdout, stderr) {
+		if (error)
+			console.log(error)
 	})
 })
 // }}}
