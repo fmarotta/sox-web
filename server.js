@@ -8,7 +8,10 @@ const bodyParser = require('/usr/lib/node_modules/body-parser')
 const child_process = require('child_process')
 const express = require('/usr/lib/node_modules/express')
 const fs = require('fs')
-const terminate = require('/usr/lib/node_modules/terminate')
+const http = require('http')
+const Pty = require('/usr/lib/node_modules/node-pty')
+//const url = require('url')
+const WebSocket = require('/usr/lib/node_modules/ws')
 
 // Config
 // TODO: config file
@@ -16,9 +19,32 @@ const baseMusicPath = '/home/fmarotta/Music'
 const port = 3001
 
 // Initializations
-const app = express();
-const server = app.listen(port, function() {
+const app = express()
+const server = http.createServer(app)
+const wss = new WebSocket.Server({server})
+server.listen(port, function() {
 	console.log("Server listening on port "+port)
+})
+
+wss.on('connection', function connection(ws, req) {
+	console.log(req.url)
+
+	ws.on('message', function incoming(relPath) {
+		console.log(relPath)
+		var path = baseMusicPath+relPath
+		var pty = Pty.spawn('/bin/bash', ['-c', 'play \''+path+'\''], {
+			name: 'dumb',
+			cols: 80,
+			rows: 24,
+			cwd: process.cwd(),
+			env: getEnv()
+		})
+		pty.on('data', function(data) {
+			console.log(data)
+			ws.send(data)
+		})
+	})
+	ws.send('ciao, socket aperto')
 })
 
 // the process of the song being played
@@ -75,6 +101,8 @@ app.post('/music', function(req, res) {
 					res.json(JSON.stringify(response))
 				})
 			})
+
+			/* USE CHILD_PROCESS.EXEC
 			var play = child_process.exec('play -q "'+path+'"', function(error, stdout, stderr) {
 				if (error) {
 					console.log('exec error: ' + error)
@@ -85,6 +113,7 @@ app.post('/music', function(req, res) {
 				running = null
 			})
 			running = play.pid
+			*/
 		}
 	})
 })
@@ -96,3 +125,39 @@ app.post('/volume', function(req, res) {
 	})
 })
 // }}}
+
+function getEnv() {
+    // Adapted from the source code of the module pty.js
+    var env = {}
+
+    Object.keys(process.env).forEach(function (key) {
+      env[key] = process.env[key]
+    })
+
+    // Make sure we didn't start our
+    // server from inside tmux.
+    delete env.TMUX
+    delete env.TMUX_PANE
+
+    // Make sure we didn't start
+    // our server from inside screen.
+    // http://web.mit.edu/gnu/doc/html/screen_20.html
+    delete env.STY
+    delete env.WINDOW
+
+    // Delete some variables that
+    // might confuse our terminal.
+    delete env.WINDOWID
+    delete env.TERMCAP
+    delete env.COLUMNS
+    delete env.LINES
+
+    // Set $TERM to screen. This disables multiplexers
+    // that have login hooks, such as byobu.
+    env.TERM = "screen"
+
+    // Set the home directory.
+    env.HOME = '/home/fmarotta/'
+
+    return env
+}

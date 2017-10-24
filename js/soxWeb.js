@@ -56,33 +56,18 @@ class StatusPanel {
 		this.message = document.getElementById(messageId);
 		this.progress = document.getElementById(progressId);
 		this.actions = document.getElementById(actionsId);
-		this.progressTimer = null;
 	}
 	printStatus(data) {
 		if (data === undefined) {
 			this.message.innerHTML = 'Choose a song from the list on the left';
 			this.progress.innerHTML = '';
 			this.actions.innerHTML = '';
-			if (this.progressTimer) {
-				clearTimeout(this.progressTimer);
-				this.progressTimer = null;
-			}
 			return;
 		}
 
 		// message
 		this.message.innerHTML = data.message;
 		
-		// progress
-		if (this.progressTimer) {
-			clearTimeout(this.progressTimer);
-			this.progressTimer = null;
-		}
-		var startTime = new Date().getTime();
-		var durationMatch = /Duration\s*:\s*(\d+):(\d+):(\d+)\.(\d+)/gm.exec(data.message);
-		var duration = durationMatch[4]*10 + durationMatch[3]*1000 + durationMatch[2]*60000 + durationMatch[1]*3600000; // milliseconds
-		this.progressTimer = setInterval(showProgress, 375);
-
 		// actions
 		this.actions.innerHTML = '<span>pause</span>&nbsp;'+
 			'<span><input type="range" min="0" max="100" value='+
@@ -93,19 +78,6 @@ class StatusPanel {
 				if (status !== 'success')
 					alert('Error: ' + status);
 			});
-		}
-
-		function showProgress() {
-			var time = new Date().getTime();
-			var partial = (time - startTime) / 1000;
-			this.progress.innerHTML = partial.toFixed(2);
-			if (time - startTime >= duration) {
-				this.message.innerHTML = 'Choose a song from the list on the left';
-				this.progress.innerHTML = '';
-				this.actions.innerHTML = '';
-				clearTimeout(this.progressTimer);
-				this.progressTimer = null;
-			}
 		}
 	}
 }
@@ -133,6 +105,22 @@ function getMusic(path) {
 				break;
 			case 'f':
 				statusPanel.printStatus(data);
+
+				// TODO: let the server tell us the port of the socket
+				var webSocketServer = 'ws://localhost';
+				var webSocketPort = 3001;
+
+				// connect to web socket
+				var connection = new WebSocket(webSocketServer+':'+webSocketPort, ['soap', 'xmpp']);
+	
+				connection.onopen = function() {
+					connection.send(path);
+				};
+				connection.onmessage = function (e) {
+					document.getElementById('progress').innerHTML = e.data;
+					//console.log(e.data);
+				};
+
 				break;
 			default:
 				alert("Did not expect this response from server.");
