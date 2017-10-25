@@ -10,7 +10,6 @@ const express = require('/usr/lib/node_modules/express')
 const fs = require('fs')
 const http = require('http')
 const Pty = require('/usr/lib/node_modules/node-pty')
-//const url = require('url')
 const WebSocket = require('/usr/lib/node_modules/ws')
 
 // Config
@@ -26,29 +25,8 @@ server.listen(port, function() {
 	console.log("Server listening on port "+port)
 })
 
-wss.on('connection', function connection(ws, req) {
-	console.log(req.url)
-
-	ws.on('message', function incoming(relPath) {
-		console.log(relPath)
-		var path = baseMusicPath+relPath
-		var pty = Pty.spawn('/bin/bash', ['-c', 'play \''+path+'\''], {
-			name: 'dumb',
-			cols: 80,
-			rows: 24,
-			cwd: process.cwd(),
-			env: getEnv()
-		})
-		pty.on('data', function(data) {
-			console.log(data)
-			ws.send(data)
-		})
-	})
-	ws.send('ciao, socket aperto')
-})
-
-// the process of the song being played
-var running = null
+// global variable for the pseudoterminal
+var pty = null
 
 // Allows cross-origin requests
 app.use(function(req, res, next) {
@@ -67,7 +45,7 @@ app.use(bodyParser.json())
 // Router {{{
 app.post('/music', function(req, res) {
 	var path = baseMusicPath+req.body.path
-	var response = {type: '', body: '', message: '', volume: ''}
+	var response = {type: '', songs: '', message: '', volume: ''}
 
 	fs.lstat(path, function(err, stats) {
 		if (err)
@@ -76,44 +54,37 @@ app.post('/music', function(req, res) {
 		if (stats.isDirectory()) {
 			fs.readdir(path, function(err, files) {
 				response.type = 'd'
-				response.body = JSON.stringify(files)
+				response.songs = files
 				res.json(JSON.stringify(response))
 			})
 		}else if (stats.isFile()) {
-			if (running) {
-				console.log(running)
-				terminate(running, function(err) {
-					if (err)
-						console.log(err)
-				})
-				setTimeout(function() {}, 1000)
+			try {
+				process.kill(pty.pid, 'SIGINT')
+				pty = null
+			}catch (e) {
 			}
 
-			var soxi = child_process.exec('soxi "'+path+'"', function(error, stdout, stderr) {
-				if (error)
-					console.log('exec error: ' + error)
-				response.type = 'f'
-				response.message = stdout.replace(/\n/g, '<br/>')
-				var volume = child_process.exec('pactl list sinks | grep "Volume: front-left:" | awk \'{print ($3+$10)*100/131070}\'', function(error, stdout, stderr) {
+			var soxiPromise = new Promise(function(resolve, reject) {
+				var soxi = child_process.exec('soxi \''+path+'\'', function(error, stdout, stderr) {
 					if (error)
-						console.log('exec error: ' + error)
-					response.volume = stdout
-					res.json(JSON.stringify(response))
+						reject(Error(error))
+					resolve(stdout.replace(/\n/g, '<br/>'))
 				})
 			})
-
-			/* USE CHILD_PROCESS.EXEC
-			var play = child_process.exec('play -q "'+path+'"', function(error, stdout, stderr) {
-				if (error) {
-					console.log('exec error: ' + error)
-					running = null
-				}
+			var volumePromise = new Promise(function(resolve, reject) {
+				var volume = child_process.exec('pactl list sinks | grep "Volume: front-left:" | awk \'{print ($3+$10)*100/131070}\'', function(error, stdout, stderr) {
+					if (error)
+						reject(Error(error))
+					resolve(stdout)
+				})
 			})
-			play.on('exit', function(code) {
-				running = null
+			Promise.all([soxiPromise, volumePromise]).then(function(results) {
+				response.type = 'f'
+				response.port = port
+				response.message = results[0]
+				response.volume = results[1]
+				res.json(JSON.stringify(response))
 			})
-			running = play.pid
-			*/
 		}
 	})
 })
@@ -124,8 +95,62 @@ app.post('/volume', function(req, res) {
 			console.log(error)
 	})
 })
+
+app.post('/actions', function(req, res) {
+	var action = req.body.action
+	
+	switch (action) {
+		case 'pause':
+			try {
+				process.kill(pty.pid, 'SIGSTOP')
+			}catch (e) {}
+			res.json(JSON.stringify('OK'))
+			break
+		case 'play':
+			try {
+				process.kill(pty.pid, 'SIGCONT')
+			}catch (e) {}
+			res.json(JSON.stringify('OK'))
+			break
+		case 'stop':
+			try {
+				process.kill(pty.pid, 'SIGTERM')
+			}catch (e) {}
+			res.json(JSON.stringify('OK'))
+			break
+		default:
+			res.json(JSON.stringify('I did not understand'))
+			console.log('did not understand action')
+	}
+})
 // }}}
 
+// Web Socket {{{
+wss.on('connection', function connection(ws, req) {
+	//console.log(req.url)
+
+	ws.on('message', function incoming(relPath) {
+		var path = baseMusicPath+relPath
+		pty = Pty.spawn('/bin/bash', ['-c', 'play \''+path+'\''], {
+			name: 'dumb',
+			cols: 256,
+			rows: 16,
+			cwd: process.cwd(),
+			env: getEnv()
+		})
+		pty.on('data', function(data) {
+			if (data.match(/In:[0-9]*\.[0-9]*/))
+				ws.send(data.replace(/ /g, '&nbsp;'))
+		})
+		pty.on('close', function() {
+			ws.send('Done.')
+			ws.terminate()
+		})
+	})
+})
+// }}}
+
+// functions {{{
 function getEnv() {
     // Adapted from the source code of the module pty.js
     var env = {}
@@ -161,3 +186,4 @@ function getEnv() {
 
     return env
 }
+// }}}
