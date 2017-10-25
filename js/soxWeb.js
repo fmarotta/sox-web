@@ -8,6 +8,8 @@ class LocationBar {
 		return this.element.innerHTML.replace(/<\/?span>/g, '');
 	}
 	setPath(path) {
+		this.element.innerHTML = path.replace(/.*\//g, '<span>$&</span>');
+		/*
 		var i;
 		var innerHTML = '';
 		var splittedPath = path.split('/');
@@ -15,6 +17,7 @@ class LocationBar {
 		for (i = 1; i < splittedPath.length; i++)
 			innerHTML += '<span>'+splittedPath[i]+'/</span>';
 		this.element.innerHTML = innerHTML;
+		*/
 	}
 }
 
@@ -38,13 +41,11 @@ class SongsPanel {
 
 		// add event listeners (until now there were no elements)
 		$('.path').click(function() {
-			var newPath = '/'+locationBar.getPath()+$(this).text();
-
+			var newPath = locationBar.getPath()+$(this).text();
 			getMusic(newPath);
 		});
 		$('.up').click(function() {
-			var newPath = '/'+locationBar.getPath().split('/').slice(0, -2).join('/');
-
+			var newPath = locationBar.getPath().split('/').slice(0, -2).join('/');
 			getMusic(newPath);
 		});
 	}
@@ -57,22 +58,66 @@ class StatusPanel {
 		this.progress = document.getElementById(progressId);
 		this.actions = document.getElementById(actionsId);
 	}
-	printStatus(data) {
-		if (data === undefined) {
+	printMessage(message) {
+		if (message === undefined) {
 			this.message.innerHTML = 'Choose a song from the list on the left';
+			return;
+		}
+		// message
+		this.message.innerHTML = message;
+	}
+	printProgress(progress) {
+		if (progress === undefined) {
 			this.progress.innerHTML = '';
+			return;
+		}
+		// progress
+		this.progress.innerHTML = progress;
+	}
+	printActions(volume) {
+		if (volume === undefined) {
 			this.actions.innerHTML = '';
 			return;
 		}
-
-		// message
-		this.message.innerHTML = data.message;
-		
 		// actions
-		this.actions.innerHTML = '<span>pause</span>&nbsp;'+
-			'<span><input type="range" min="0" max="100" value='+
-			data.volume+' class="slider" id="volumeSlider"></span>';
+		this.actions.innerHTML = '<hr><button id="playPause">pause</button>'+
+			'<button id="prev">prev</button>'+
+			'<button id="stop">stop</button>'+
+			'<button id="next">next</button>'+
+			'<button id="shuffle">shuffle</button>'+
+			'<button id="repeat">repeat</button>'+
+			'<span>volume: <input type="range" min="0" max="100" step="5" '+
+			'value='+ volume+' class="slider" id="volumeSlider"></span>';
 
+		// playPause
+		$('#playPause').on('click', function() {
+			var action = $(this).text();
+			$.post('./actions', {action: action}, function(data, status) {
+				if (status !== 'success')
+					alert('Error: ' + status);
+				if (JSON.parse(data) != "OK")
+					console.log('Something went wrong');
+
+				if (action == 'pause')
+					$('#playPause').text('play');
+				else
+					$('#playPause').text('pause');
+			});
+		})
+
+		// stop
+		// TODO fare una class action per cui al click posto l'id o il testo. per playPause è diverso, ma stop, prev, next possono andar bene.
+		$('#stop').on('click', function() {
+			var action = 'stop';
+			$.post('./actions', {action: action}, function(data, status) {
+				if (status !== 'success')
+					alert('Error: ' + status);
+				if (JSON.parse(data) != "OK")
+					console.log('Something went wrong');
+			});
+		})
+
+		// volume slider
 		document.getElementById('volumeSlider').oninput = function() {
 			$.post('./volume', {vol: this.value}, function(data, status) {
 				if (status !== 'success')
@@ -86,8 +131,9 @@ $(document).ready(function() {
 	locationBar = new LocationBar('locationBar');
 	songsPanel = new SongsPanel('songsPanel');
 	statusPanel = new StatusPanel('statusPanel', 'message', 'progress', 'actions');
+	statusPanel.printMessage();
 
-	getMusic('/');
+	getMusic('');
 });
 
 function getMusic(path) {
@@ -99,26 +145,29 @@ function getMusic(path) {
 		data = JSON.parse(data);
 		switch(data.type) {
 			case 'd':
-				locationBar.setPath(path);
-				songsPanel.printSongs(JSON.parse(data.body));
-				statusPanel.printStatus();
+				locationBar.setPath(path+'/');
+				songsPanel.printSongs(data.songs);
 				break;
 			case 'f':
-				statusPanel.printStatus(data);
+				statusPanel.printMessage(data.message);
+				statusPanel.printActions(data.volume);
 
-				// TODO: let the server tell us the port of the socket
 				var webSocketServer = 'ws://localhost';
-				var webSocketPort = 3001;
+				var webSocketPort = data.port;
 
 				// connect to web socket
 				var connection = new WebSocket(webSocketServer+':'+webSocketPort, ['soap', 'xmpp']);
-	
 				connection.onopen = function() {
 					connection.send(path);
 				};
 				connection.onmessage = function (e) {
-					document.getElementById('progress').innerHTML = e.data;
-					//console.log(e.data);
+					// TODO: use a monospace font for the progress
+					statusPanel.printProgress(e.data);
+					if (e.data == 'Done.') {
+						statusPanel.printMessage();
+						statusPanel.printActions();
+						statusPanel.printProgress();
+					}
 				};
 
 				break;
