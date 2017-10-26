@@ -59,18 +59,14 @@ app.post('/music', function(req, res) {
 			})
 		}else if (stats.isFile()) {
 			try {
-				process.kill(pty.pid, 'SIGINT')
+				// SIGTERM is not noticed by pty.on('exit'); that is, the
+				// resulting signal is 0.
+				process.kill(pty.pid, 'SIGTERM')
 				pty = null
 			}catch (e) {
+				// TODO
 			}
 
-			var soxiPromise = new Promise(function(resolve, reject) {
-				var soxi = child_process.exec('soxi \''+path+'\'', function(error, stdout, stderr) {
-					if (error)
-						reject(Error(error))
-					resolve(stdout.replace(/\n/g, '<br/>'))
-				})
-			})
 			var volumePromise = new Promise(function(resolve, reject) {
 				var volume = child_process.exec('pactl list sinks | grep "Volume: front-left:" | awk \'{print ($3+$10)*100/131070}\'', function(error, stdout, stderr) {
 					if (error)
@@ -78,12 +74,13 @@ app.post('/music', function(req, res) {
 					resolve(stdout)
 				})
 			})
-			Promise.all([soxiPromise, volumePromise]).then(function(results) {
+			volumePromise.then(function(volume) {
 				response.type = 'f'
 				response.port = port
-				response.message = results[0]
-				response.volume = results[1]
+				response.volume = volume
 				res.json(JSON.stringify(response))
+			}).catch(function(error) {
+				console.log(error)
 			})
 		}
 	})
@@ -93,6 +90,7 @@ app.post('/volume', function(req, res) {
 	var sinkvol = child_process.exec('pactl set-sink-volume @DEFAULT_SINK@ '+req.body.vol+'%', function(error, stdout, stderr) {
 		if (error)
 			console.log(error)
+		res.json(JSON.stringify('OK'))
 	})
 })
 
@@ -114,7 +112,13 @@ app.post('/actions', function(req, res) {
 			break
 		case 'stop':
 			try {
-				process.kill(pty.pid, 'SIGTERM')
+				// SIGKILL makes the pty exit with code 0 and signal 9. I use
+				// this to know if the process has been stopped or not. if it
+				// has, I have to clean the bars, so I send a 'Done.' through
+				// the web socket. If it was killed by SIGTERM I do not send
+				// anything, otherwise the message sent through the socket will
+				// arrive later and overwrite the new messages of the bars.
+				process.kill(pty.pid, 'SIGKILL')
 			}catch (e) {}
 			res.json(JSON.stringify('OK'))
 			break
@@ -129,23 +133,27 @@ app.post('/actions', function(req, res) {
 wss.on('connection', function connection(ws, req) {
 	//console.log(req.url)
 
-	ws.on('message', function incoming(relPath) {
-		var path = baseMusicPath+relPath
-		pty = Pty.spawn('/bin/bash', ['-c', 'play \''+path+'\''], {
-			name: 'dumb',
-			cols: 256,
-			rows: 16,
-			cwd: process.cwd(),
-			env: getEnv()
-		})
-		pty.on('data', function(data) {
-			if (data.match(/In:[0-9]*\.[0-9]*/))
-				ws.send(data.replace(/ /g, '&nbsp;'))
-		})
-		pty.on('close', function() {
-			ws.send('Done.')
-			ws.terminate()
-		})
+	ws.on('message', function incoming(message) {
+		if (message.match('song:')) {
+			var path = baseMusicPath+message.replace('song:', '')
+			pty = Pty.spawn('/bin/bash', ['-c', 'play \''+path+'\''], {
+				name: 'dumb',
+				cols: 256,
+				rows: 16,
+				cwd: process.cwd(),
+				env: getEnv()
+			})
+			pty.on('data', function(data) {
+				ws.send(data)
+			})
+			pty.on('exit', function(code, signal) {
+				//console.log('code: '+code+' signal: '+signal)
+				if (signal == 9)
+					ws.send('Done.')
+				ws.terminate()
+			})
+		}else {
+		}
 	})
 })
 // }}}

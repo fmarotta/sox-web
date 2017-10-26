@@ -62,9 +62,12 @@ class StatusPanel {
 		if (message === undefined) {
 			this.message.innerHTML = 'Choose a song from the list on the left';
 			return;
+		}else if (message === '') {
+			this.message.innerHTML = '';
+			return;
 		}
 		// message
-		this.message.innerHTML = message;
+		this.message.innerHTML += message;
 	}
 	printProgress(progress) {
 		if (progress === undefined) {
@@ -106,7 +109,6 @@ class StatusPanel {
 		})
 
 		// stop
-		// TODO fare una class action per cui al click posto l'id o il testo. per playPause è diverso, ma stop, prev, next possono andar bene.
 		$('#stop').on('click', function() {
 			var action = 'stop';
 			$.post('./actions', {action: action}, function(data, status) {
@@ -149,24 +151,42 @@ function getMusic(path) {
 				songsPanel.printSongs(data.songs);
 				break;
 			case 'f':
-				statusPanel.printMessage(data.message);
-				statusPanel.printActions(data.volume);
-
 				var webSocketServer = 'ws://localhost';
 				var webSocketPort = data.port;
+				statusPanel.printActions(data.volume);
+				statusPanel.printMessage('');
 
 				// connect to web socket
 				var connection = new WebSocket(webSocketServer+':'+webSocketPort, ['soap', 'xmpp']);
 				connection.onopen = function() {
-					connection.send(path);
+					connection.send('song:'+path);
 				};
 				connection.onmessage = function (e) {
 					// TODO: use a monospace font for the progress
-					statusPanel.printProgress(e.data);
-					if (e.data == 'Done.') {
-						statusPanel.printMessage();
-						statusPanel.printActions();
-						statusPanel.printProgress();
+					if (/\n/.exec(e.data)) {
+						var i;
+						var lines = e.data.split(/\n/);
+						for (i = 0; i < lines.length; i++) {
+							if (/In:[0-9]*\.[0-9]*/.exec(lines[i])) {
+								statusPanel.printProgress(lines[i].replace(/ /g, '&nbsp;'));
+							}else if (lines[i].match(/Done./)) {
+								statusPanel.printMessage();
+								statusPanel.printProgress();
+								statusPanel.printActions();
+							}else if (/\S/.test(lines[i]) && !lines[i].match(/Aborted./)) {
+								statusPanel.printMessage(lines[i]+'<br/>');
+							}
+						}
+					}else {
+						if (/In:[0-9]*\.[0-9]*/.exec(e.data)) {
+							statusPanel.printProgress(e.data.replace(/ /g, '&nbsp;'));
+						}else if (e.data.match(/Done./)) {
+							statusPanel.printMessage();
+							statusPanel.printProgress();
+							statusPanel.printActions();
+						}else if (/\S/.test(e.data) && !e.data.match(/Aborted./)) {
+							statusPanel.printMessage(e.data+'<br/>');
+						}
 					}
 				};
 
