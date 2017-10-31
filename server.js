@@ -9,24 +9,26 @@ const child_process = require('child_process')
 const express = require('/usr/lib/node_modules/express')
 const fs = require('fs')
 const http = require('http')
+const ip = require('/usr/lib/node_modules/ip')
 const Pty = require('/usr/lib/node_modules/node-pty')
 const WebSocket = require('/usr/lib/node_modules/ws')
 
 // Config
 // TODO: config file
-const baseMusicPath = '/home/fmarotta/Music'
-const port = 3001
+const baseMusicPath = '/home/fmarotta/Music/'
+const serverIp = ip.address()
+const serverPort = 3001
 
 // Initializations
 const app = express()
 const server = http.createServer(app)
 const wss = new WebSocket.Server({server})
-server.listen(port, function() {
-	console.log("Server listening on port "+port)
+server.listen(serverPort, function() {
+	console.log("Server listening on port "+serverPort)
 })
 
-// global variable for the pseudoterminal
 var pty = null
+var playLists = []
 
 // Allows cross-origin requests
 app.use(function(req, res, next) {
@@ -43,7 +45,7 @@ app.use(bodyParser.urlencoded({extended: false}))
 app.use(bodyParser.json())
 
 // Router {{{
-app.post('/music', function(req, res) {
+app.post('/myMusic', function(req, res) {
 	var path = baseMusicPath+req.body.path
 	var response = {type: '', songs: '', message: '', volume: ''}
 
@@ -76,13 +78,49 @@ app.post('/music', function(req, res) {
 			})
 			volumePromise.then(function(volume) {
 				response.type = 'f'
-				response.port = port
+				response.server = 'ws://'+serverIp+':'+serverPort
 				response.volume = volume
 				res.json(JSON.stringify(response))
 			}).catch(function(error) {
 				console.log(error)
 			})
 		}
+	})
+})
+
+app.get('/allMyMusic', function(req, res) {
+	try {
+		// SIGTERM is not noticed by pty.on('exit'); that is, the
+		// resulting signal is 0.
+		process.kill(pty.pid, 'SIGTERM')
+		pty = null
+	}catch (e) {
+		// TODO
+	}
+
+	var response = {songs: '', server: '', volume: ''}
+	var volumePromise = new Promise(function(resolve, reject) {
+		var volume = child_process.exec('pactl list sinks | grep "Volume: front-left:" | awk \'{print ($3+$10)*100/131070}\'', function(error, stdout, stderr) {
+			if (error)
+				reject(Error(error))
+			resolve(stdout)
+		})
+	})
+	var allMyMusicPromise = new Promise(function(resolve, reject) {
+		var command = 'find '+baseMusicPath+' -name "*.mp3" | sort --random-sort'
+		var allMyMusic = child_process.exec(command, function(error, stdout, stderr) {
+			if (error)
+				reject(Error(error))
+			resolve(stdout.replace(new RegExp (baseMusicPath, 'g'), ''))
+		})
+	})
+	Promise.all([allMyMusicPromise, volumePromise]).then(function(a) {
+		response.server = 'ws://'+serverIp+':'+serverPort
+		response.songs = a[0]
+		response.volume = a[1]
+		res.json(JSON.stringify(response))
+	}).catch(function(error) {
+		console.log(error)
 	})
 })
 
@@ -122,6 +160,12 @@ app.post('/actions', function(req, res) {
 			}catch (e) {}
 			res.json(JSON.stringify('OK'))
 			break
+		case 'next':
+			try {
+				process.kill(pty.pid, 'SIGINT')
+			}catch (e) {}
+			res.json(JSON.stringify('OK'))
+			break
 		default:
 			res.json(JSON.stringify('I did not understand'))
 			console.log('did not understand action')
@@ -134,9 +178,14 @@ wss.on('connection', function connection(ws, req) {
 	//console.log(req.url)
 
 	ws.on('message', function incoming(message) {
-		if (message.match('song:')) {
-			var path = baseMusicPath+message.replace('song:', '')
-			pty = Pty.spawn('/bin/bash', ['-c', 'play \''+path+'\''], {
+		if (message.match('path:')) {
+			var path = ''
+			if (message.match('\n')) {
+				path = message.replace('path:', '"'+baseMusicPath).replace(/\n/g, '" "'+baseMusicPath).replace(new RegExp(' "'+baseMusicPath+'$'), '')
+			}else {
+				path = '\''+baseMusicPath+message.replace('path:', '')+'\''
+			}
+			pty = Pty.spawn('/bin/bash', ['-c', 'play '+path], {
 				name: 'dumb',
 				cols: 256,
 				rows: 16,

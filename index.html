@@ -1,81 +1,53 @@
 <!DOCTYPE html>
-<html lang="en">
-<head>
-  <title>Sox Server</title>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css">
-  <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.2.1/jquery.min.js"></script>
-  <script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/js/bootstrap.min.js"></script>
-  <script type="text/javascript" src="./js/soxWeb.js"></script>
-  <style>
-    /* Set height of the grid so .sidenav can be 100% (adjust if needed) */
-    .row.content {height: 1500px}
-    
-    /* Set gray background color and 100% height */
-    .sidenav {
-      background-color: #f1f1f1;
-      height: 100%;
-    }
-    
-    /* Set black background color, white text and some padding */
-    footer {
-      background-color: #555;
-      color: white;
-      padding: 15px;
-    }
-    
-    /* On small screens, set height to 'auto' for sidenav and grid */
-    @media screen and (max-width: 767px) {
-      .sidenav {
-        height: auto;
-        padding: 15px;
-      }
-      .row.content {height: auto;} 
-    }
-
-	#volumeSlider {
-		display: inline;
-		width: 100px;
-	}
-  </style>
-</head>
+<html>
+<title>SoX Web</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="stylesheet" href="https://www.w3schools.com/w3css/4/w3.css">
+<link rel="stylesheet" href="https://www.w3schools.com/lib/w3-theme-teal.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
+<script src="https://ajax.googleapis.com/ajax/libs/jquery/3.2.1/jquery.min.js"></script>
+<script type="text/javascript" src="./js/main.js"></script>
 <body>
 
-<div class="container-fluid">
-  <div class="row content">
-    <div class="col-sm-4 sidenav">
-      <h3>My Songs</h3>
-      <hr>
-	  <h4><small><span>Path: music</span><span id="locationBar"></span></small></h4>
-      <ul class="nav nav-pills nav-stacked" id="songsPanel">
-      </ul><br>
-      <div class="input-group">
-        <input type="text" class="form-control" placeholder="Search Song...">
-        <span class="input-group-btn">
-          <button class="btn btn-default" type="button">
-            <span class="glyphicon glyphicon-search"></span>
-          </button>
-        </span>
-      </div>
-    </div>
+<div class="w3-sidebar w3-collapse w3-white w3-animate-left w3-large" style="z-index:3;width:38.1%;" id="mySidebar">
 
-    <div class="col-sm-8">
-      <h3>Song Status</h3>
-      <hr>
-      <div id="statusPanel">
-		  <div id="message"></div>
-		  <br/>
-		  <div id="progress"></div>
-		  <div id="actions"></div>
-      </div>
-    </div>
-  </div>
+<div class="w3-bar w3-black w3-center">
+  <a class="w3-bar-item w3-button" style="width:50%" href="javascript:void(0)" onclick="openNav('myMusicNav')">
+  <i class="fa fa-bars w3-xlarge"></i> My Music</a>
+  <a class="w3-bar-item w3-button" style="width:50%" href="javascript:void(0)" onclick="openNav('myPlaylistsNav')">
+  <i class="fa fa-file w3-xlarge"></i> My Playlists</a>
 </div>
 
-<footer class="container-fluid">
-  <p>Footer Text</p>
+<div id="myMusicNav">
+  <div id="actionsBar" class="w3-bar"></div>
+  <div id="locationBar" class="w3-bar"></div>
+  <ul class="w3-ul w3-large" id="musicPanel"></ul>
+</div>
+</div>
+
+<div class="w3-overlay w3-hide-large" onclick="w3_close()" style="cursor:pointer" id="myOverlay"></div>
+
+<div class="w3-main" style="margin-left:38.1%;"> 
+
+<div class="w3-top w3-theme w3-large w3-hide-large">
+  <i class="fa fa-bars w3-button w3-teal w3-xlarge" onclick="w3_open()"></i>
+</div>
+
+<header class="w3-container w3-theme w3-center">
+  <h1 class="w3-xxxlarge">Sox Web</h1>
+</header>
+
+<div id="statusPaneel" class="w3-container w3-padding-large w3-section w3-light-grey">
+  <div id="statusMessage"></div>
+  <div id="statusProgress"></div>
+  <div id="statusActions"></div>
+</div>
+
+<footer class="w3-container w3-padding-large w3-light-grey w3-justify w3-opacity">
+	<p>footer</p>
 </footer>
 
+</div>
+
 </body>
-</html>
+</html> 
