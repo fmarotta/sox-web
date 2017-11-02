@@ -126,9 +126,7 @@ class StatusPanel {
 			'<button id="prev">prev</button>'+
 			'<button id="stop">stop</button>'+
 			'<button id="next">next</button>'+
-			'<button id="shuffle">shuffle</button>'+
-			'<button id="repeat">repeat</button>'+
-			'<span>volume: <input type="range" min="0" max="100" step="5" '+
+			'<span style="float:right">volume: <input type="range" min="0" max="100" step="3" '+
 			'value='+ volume+' class="slider" id="volumeSlider"></span>';
 
 		// playPause
@@ -184,6 +182,7 @@ $(document).ready(function() {
 	locationBar = new LocationBar('locationBar');
 	musicPanel = new MusicPanel('musicPanel');
 	statusPanel = new StatusPanel('statusPanel', 'statusMessage', 'statusProgress', 'statusActions');
+	statusPanel.printMessage();
 
 	openNav('myMusicNav');
 });
@@ -221,37 +220,28 @@ function connectToSocket(server, path) {
 		connection.send('path:'+path);
 	};
 	connection.onmessage = function (e) {
-		// TODO: use a monospace font for the progress
 		if (/\n/.test(e.data)) {
 			var i;
 			var lines = e.data.split(/\n/);
 			for (i = 0; i < lines.length; i++) {
-				if (/In:[0-9]*\.[0-9]*/.test(lines[i])) {
-					statusPanel.printProgress(lines[i].replace(/ /g, '&nbsp;'));
-				}else if (lines[i].match(/Done\./)) {
-					statusPanel.printMessage();
-					statusPanel.printProgress();
-					statusPanel.printActions();
-				}else if (/\S/.test(lines[i]) && !lines[i].match(/(Aborted|Skipped)/)) {
-					if (lines[i].match(path)) {
-						statusPanel.printMessage('<hr/><h3>'+lines[i]+'</h3><br/>');
-					}else {
-						statusPanel.printMessage(lines[i]+'<br/>');
-					}
-				}
+				sortOutput(lines[i]);
 			}
 		}else {
-			if (/In:[0-9]*\.[0-9]*/.test(e.data)) {
-				statusPanel.printProgress(e.data.replace(/ /g, '&nbsp;'));
-			}else if (e.data.match(/Done\./)) {
+			sortOutput(e.data);
+		}
+
+		function sortOutput(line) {
+			if (/In:[0-9]*\.[0-9]*/.test(line)) {
+				statusPanel.printProgress(line.replace(/ /g, '&nbsp;'));
+			}else if (line.match(/Done\./)) {
 				statusPanel.printMessage();
 				statusPanel.printProgress();
 				statusPanel.printActions();
-			}else if (/\S/.test(e.data) && !e.data.match(/(Aborted|Skipped)/)) {
-				if (path.match(e.data)) {
-					statusPanel.printMessage('<hr/><h3>'+e.data+'</h3><br/>');
+			}else if (/\S/.test(line) && !line.match(/(Aborted|Skipped)/)) {
+				if (/\//.test(line)) {
+					statusPanel.printMessage('<h3>'+line+'</h3>');
 				}else {
-					statusPanel.printMessage(e.data+'<br/>');
+					statusPanel.printMessage(line+'<br/>');
 				}
 			}
 		}

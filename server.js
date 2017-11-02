@@ -15,7 +15,7 @@ const WebSocket = require('/usr/lib/node_modules/ws')
 
 // Config
 // TODO: config file
-const baseMusicPath = '/home/fmarotta/Music/'
+const baseMusicPath = '/mnt/media/music/'
 const serverIp = ip.address()
 const serverPort = 3001
 
@@ -24,7 +24,7 @@ const app = express()
 const server = http.createServer(app)
 const wss = new WebSocket.Server({server})
 server.listen(serverPort, function() {
-	console.log("Server listening on port "+serverPort)
+	//console.log("Server listening on port "+serverPort)
 })
 
 var pty = null
