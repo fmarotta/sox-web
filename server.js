@@ -15,7 +15,7 @@ const WebSocket = require('/usr/lib/node_modules/ws')
 
 // Config
 // TODO: config file
-const baseMusicPath = '/mnt/media/music/'
+const baseMusicPath = '/home/fmarotta/Music/'
 const serverIp = ip.address()
 const serverPort = 3001
 
@@ -45,60 +45,41 @@ app.use(bodyParser.urlencoded({extended: false}))
 app.use(bodyParser.json())
 
 // Router {{{
-app.post('/myMusic', function(req, res) {
-	var path = baseMusicPath+req.body.path
-	var response = {type: '', songs: '', message: '', volume: ''}
+app.post('/myMusicDir', function(req, res) {
+	var path = baseMusicPath+req.body.path+'/'
 
-	fs.lstat(path, function(err, stats) {
-		if (err)
-			return console.log(err)
-
-		if (stats.isDirectory()) {
-			fs.readdir(path, function(err, files) {
-				response.type = 'd'
-				response.songs = files
-				res.json(JSON.stringify(response))
-			})
-		}else if (stats.isFile()) {
-			try {
-				// SIGTERM is not noticed by pty.on('exit'); that is, the
-				// resulting signal is 0.
-				process.kill(pty.pid, 'SIGTERM')
-				pty = null
-			}catch (e) {
-				// TODO
-			}
-
-			var volumePromise = new Promise(function(resolve, reject) {
-				var volume = child_process.exec('pactl list sinks | grep "Volume: front-left:" | awk \'{print ($3+$10)*100/131070}\'', function(error, stdout, stderr) {
-					if (error)
-						reject(Error(error))
-					resolve(stdout)
-				})
-			})
-			volumePromise.then(function(volume) {
-				response.type = 'f'
-				response.server = 'ws://'+serverIp+':'+serverPort
-				response.volume = volume
-				res.json(JSON.stringify(response))
-			}).catch(function(error) {
-				console.log(error)
-			})
-		}
+	getDirContents(path).then((contents) => {
+		res.json(JSON.stringify(contents))
+	}).catch((error) => {
+		console.log(error)
 	})
 })
 
-app.get('/allMyMusic', function(req, res) {
-	try {
-		// SIGTERM is not noticed by pty.on('exit'); that is, the
-		// resulting signal is 0.
-		process.kill(pty.pid, 'SIGTERM')
-		pty = null
-	}catch (e) {
-		// TODO
-	}
+app.get('/serverInfo', function(req, res) {
+	var server = 'ws://'+serverIp+':'+serverPort
+	res.json(JSON.stringify(server))
+})
 
-	var response = {songs: '', server: '', volume: ''}
+app.post('/randomMusic', function(req, res) {
+	var randomMusicPromise = new Promise(function(resolve, reject) {
+		var path = baseMusicPath+req.body.path
+		var command = 'find '+path+' -name "*.mp3" | sort --random-sort'
+		var randomMusic = child_process.exec(command, function(error, stdout, stderr) {
+			if (error)
+				reject(Error(error))
+			resolve(stdout.replace(new RegExp (baseMusicPath, 'g'), ''))
+		})
+	})
+	randomMusicPromise.then((randomMusic) => {
+		randomMusic = randomMusic.split('\n').slice(0, -1)
+		res.json(JSON.stringify(randomMusic))
+	}).catch((error) => {
+		console.log(error)
+	})
+})
+
+// volume {{{
+app.get('/volume', function(req, res) {
 	var volumePromise = new Promise(function(resolve, reject) {
 		var volume = child_process.exec('pactl list sinks | grep "Volume: front-left:" | awk \'{print ($3+$10)*100/131070}\'', function(error, stdout, stderr) {
 			if (error)
@@ -106,21 +87,10 @@ app.get('/allMyMusic', function(req, res) {
 			resolve(stdout)
 		})
 	})
-	var allMyMusicPromise = new Promise(function(resolve, reject) {
-		var command = 'find '+baseMusicPath+' -name "*.mp3" | sort --random-sort'
-		var allMyMusic = child_process.exec(command, function(error, stdout, stderr) {
-			if (error)
-				reject(Error(error))
-			resolve(stdout.replace(new RegExp (baseMusicPath, 'g'), ''))
-		})
-	})
-	Promise.all([allMyMusicPromise, volumePromise]).then(function(a) {
-		response.server = 'ws://'+serverIp+':'+serverPort
-		response.songs = a[0]
-		response.volume = a[1]
-		res.json(JSON.stringify(response))
+	volumePromise.then(function(volume) {
+		res.json(JSON.stringify(volume))
 	}).catch(function(error) {
-		console.log(error)
+		console.log(Error(error))
 	})
 })
 
@@ -131,6 +101,7 @@ app.post('/volume', function(req, res) {
 		res.json(JSON.stringify('OK'))
 	})
 })
+// }}}
 
 app.post('/actions', function(req, res) {
 	var action = req.body.action
@@ -160,12 +131,6 @@ app.post('/actions', function(req, res) {
 			}catch (e) {}
 			res.json(JSON.stringify('OK'))
 			break
-		case 'next':
-			try {
-				process.kill(pty.pid, 'SIGINT')
-			}catch (e) {}
-			res.json(JSON.stringify('OK'))
-			break
 		default:
 			res.json(JSON.stringify('I did not understand'))
 			console.log('did not understand action')
@@ -178,13 +143,19 @@ wss.on('connection', function connection(ws, req) {
 	//console.log(req.url)
 
 	ws.on('message', function incoming(message) {
-		if (message.match('path:')) {
-			var path = ''
-			if (message.match('\n')) {
-				path = message.replace('path:', '"'+baseMusicPath).replace(/\n/g, '" "'+baseMusicPath).replace(new RegExp(' "'+baseMusicPath+'$'), '')
-			}else {
-				path = '\''+baseMusicPath+message.replace('path:', '')+'\''
+		if (message.match('queue:')) {
+			try {
+				// SIGTERM is not noticed by pty.on('exit'); that is, the
+				// resulting signal is 0.
+				process.kill(pty.pid, 'SIGSTOP')
+				process.kill(pty.pid, 'SIGTERM')
+				pty = null
+			}catch (e) {
+				// TODO
 			}
+
+			var path = message.replace('queue:', '').replace(/baseMusicPath\//g, baseMusicPath)
+			process.exit;
 			pty = Pty.spawn('/bin/bash', ['-c', 'play '+path], {
 				name: 'dumb',
 				cols: 256,
@@ -198,7 +169,7 @@ wss.on('connection', function connection(ws, req) {
 			pty.on('exit', function(code, signal) {
 				//console.log('code: '+code+' signal: '+signal)
 				if (signal == 9)
-					ws.send('Done.')
+					ws.send('Stopped.')
 				ws.terminate()
 			})
 		}else {
@@ -242,5 +213,33 @@ function getEnv() {
     env.HOME = '/home/fmarotta/'
 
     return env
+}
+
+function getDirContents(path) {
+	return new Promise((resolve, reject) => {
+		fs.readdir(path, function(err, files) {
+			if (err)
+				reject(Error(err))
+
+			var i
+			var stats
+			var contents = []
+
+			for (i = 0; i < files.length; i++) {
+				contents[i] = new Object
+
+				stats = fs.lstatSync(path+files[i])
+				if (stats.isDirectory()) {
+					contents[i].contentType = 'dir'
+					contents[i].contentName = files[i]
+				}else if (stats.isFile()) {
+					contents[i].contentType = 'file'
+					contents[i].contentName = files[i]
+				}
+			}
+
+			resolve(contents)
+		})
+	})
 }
 // }}}
