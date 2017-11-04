@@ -15,7 +15,7 @@ const WebSocket = require('/usr/lib/node_modules/ws')
 
 // Config
 // TODO: config file
-const baseMusicPath = '/mnt/media/music/'
+const baseMusicPath = '/home/fmarotta/Music/'
 const serverIp = ip.address()
 const serverPort = 3001
 
@@ -60,19 +60,20 @@ app.get('/serverInfo', function(req, res) {
 	res.json(JSON.stringify(server))
 })
 
-app.post('/randomMusic', function(req, res) {
-	var randomMusicPromise = new Promise(function(resolve, reject) {
+app.post('/allMyMusic', function(req, res) {
+	var allMyMusicPromise = new Promise(function(resolve, reject) {
 		var path = baseMusicPath+req.body.path
-		var command = 'find '+path+' -name "*.mp3" | sort --random-sort'
-		var randomMusic = child_process.exec(command, function(error, stdout, stderr) {
+		// FIXME add other file formats as well
+		var command = 'find '+path+' -name "*.mp3" | sort'
+		var allMyMusic = child_process.exec(command, function(error, stdout, stderr) {
 			if (error)
 				reject(Error(error))
 			resolve(stdout.replace(new RegExp (baseMusicPath, 'g'), ''))
 		})
 	})
-	randomMusicPromise.then((randomMusic) => {
-		randomMusic = randomMusic.split('\n').slice(0, -1)
-		res.json(JSON.stringify(randomMusic))
+	allMyMusicPromise.then((allMyMusic) => {
+		allMyMusic = allMyMusic.split('\n').slice(0, -1)
+		res.json(JSON.stringify(allMyMusic))
 	}).catch((error) => {
 		console.log(error)
 	})

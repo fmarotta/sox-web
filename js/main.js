@@ -119,25 +119,80 @@ class StatusProgress {
 class MusicQueue {
 	constructor(elementId) {
 		this.element = document.getElementById(elementId);
-	}
-	getPlayingEq() {
-		return $('#musicQueue li:has(h3)').index();
+		this.playingEq = -1;
 	}
 	getLastEq() {
-		return $('#musicQueue li').length - 1;
+		return $('#musicQueue span').length - 1;
 	}
-	addToQueue(fileName) {
-		this.element.innerHTML += '<li><h4>' + locationBar.getPath() + fileName + '</h4></li>';
+	clear() {
+		this.element.innerHTML = '';
 	}
-	cleanPlaying() {
-		var eq = this.getPlayingEq();
-		var path = $('#musicQueue li:eq('+eq+') h3').html();
+	addToQueue(path) {
+		this.element.innerHTML += '<span class="w3-panel">\n'+
+			'<header class="w3-container w3-blue cardHeader">'+
+				'<h4>'+path+'</h4></header>\n'+
+			'<div class="w3-container w3-white" cardBody"></div>\n'+
+			'<footer class="w3-container w3-blue w3-bar cardFooter">'+
+				'<button class="w3-btn w3-small">TODO: effects</button>'+
+				'<button class="w3-btn w3-circle w3-red w3-right w3-tiny removeFromQueue">-</button></footer>\n'+
+			'</span>';
+	}
+	removeFromQueue(eq) {
+		$('#musicQueue span:eq('+eq+')').remove();
+		if (this.getLastEq() === -1)
+			statusActions.clear();
+	}
+	emphasize(eq) {
+		$('#musicQueue span:eq('+eq+') header').attr('class', 'w3-container w3-green cardHeader');
+		$('#musicQueue span:eq('+eq+') footer').attr('class', 'w3-container w3-green cardHeader');
+	}
+	deEmphasize(eq) {
+		$('#musicQueue span:eq('+eq+') header').attr('class', 'w3-container w3-blue cardHeader');
+		$('#musicQueue span:eq('+eq+') footer').attr('class', 'w3-container w3-blue cardHeader');
+		this.clearBody(eq);
+		this.playingEq = -1;
+	}
+	addBody(eq, line) {
+		var text = $('#musicQueue span:eq('+eq+') div').html();
+		$('#musicQueue span:eq('+eq+') div').html(text + line + '<br/>\n');
+	}
+	clearBody(eq) {
+		$('#musicQueue span:eq('+eq+') div').html('');
+	}
+	shuffleQueue() {
+		var i;
+		var queue = [];
 
-		$('#musicQueue li:eq('+eq+')').html('<h4>'+path+'</h4>');
+		for (i = 0; i <= this.getLastEq(); i++)
+			queue[i] = $('#musicQueue span:eq('+i+') header').text();
+
+  		var currentIndex = queue.length, temporaryValue, randomIndex;
+
+  		// While there remain elements to shuffle...
+  		while (0 !== currentIndex) {
+
+    		// Pick a remaining element...
+    		randomIndex = Math.floor(Math.random() * currentIndex);
+    		currentIndex -= 1;
+
+    		// And swap it with the current element.
+    		temporaryValue = queue[currentIndex];
+    		queue[currentIndex] = queue[randomIndex];
+    		queue[randomIndex] = temporaryValue;
+  		}
+
+		this.clear();
+		for (i = 0; i < queue.length; i++) {
+			this.addToQueue(queue[i]);
+		}
+
 	}
 	playQueued(eq) {
-		var playing = $('#musicQueue li:eq('+eq+')');
-		var path = playing.text();
+		// check if eq is valid
+		this.playingEq = eq;
+		this.emphasize(eq);
+
+		var path = $('#musicQueue span:eq('+eq+') header').text();
 		var queue = 'queue:\'baseMusicPath/'+path+'\'';
 
 		// connect to web socket
@@ -150,36 +205,39 @@ class MusicQueue {
 				var i;
 				var lines = e.data.split(/\n/);
 				for (i = 0; i < lines.length; i++) {
-					sortOutput(lines[i]);
+					// NOTE: `this' is not the music queue in the scope of this function, I can't use it.
+					musicQueue.sortOutput(eq, lines[i]);
 				}
 			}else {
-				sortOutput(e.data);
+				musicQueue.sortOutput(eq, e.data);
 			}
 		};
-
-		function sortOutput(line) {
-			if (/In:[0-9]*\.[0-9]*/.test(line)) {
-				statusProgress.printProgress(line.replace(/ /g, '&nbsp;'));
-			}else if (line.match(/Done\./)) {
-				musicQueue.cleanPlaying();
-				statusProgress.clear();
-				musicQueue.playQueued(eq+1);
-			}else if (line.match(/Stopped\./)) {
-				playing.html('<h4>'+path+'</h4>');
-				statusProgress.clear();
-			}else if (/\S/.test(line) && !line.match(/(Aborted|Skipped)/)) {
-				if (/\//.test(line)) {
-					playing.html('<h3>'+path+'</h3>');
-				}else {
-					playing.html(playing.html()+line+'<br/>\n');
-				}
-			}else if (/\S/.test(line) && line.match(/(Aborted|Skipped)/)) {
-				console.log('aborted');
-				playing.html('<h4>'+path+'</h4>');
-				statusProgress.clear();
-			}else if (/\S/.test(line)) {
-				alert(line);
+	}
+	sortOutput(eq, line) {
+		if (/In:[0-9]*\.[0-9]*/.test(line)) {
+			statusProgress.printProgress(line.replace(/ /g, '&nbsp;'));
+		}else if (line.match(/Done\./)) {
+			this.deEmphasize(eq);
+			statusProgress.clear();
+			if (eq === this.getLastEq())
+				statusActions.printQueueActions();
+			else
+				this.playQueued(eq + 1);
+		}else if (line.match(/Stopped\./)) {
+			this.deEmphasize(eq);
+			statusProgress.clear();
+		}else if (/\S/.test(line) && !line.match(/(Aborted|Skipped)/)) {
+			if (/\//.test(line)) {
+				;
+			}else {
+				this.addBody(eq, line);
 			}
+		}else if (/\S/.test(line) && line.match(/(Aborted|Skipped)/)) {
+			console.log('Aborted/Skipped');
+			this.deEmphasize(eq);
+			statusProgress.clear();
+		}else if (/\S/.test(line)) {
+			alert(line);
 		}
 	}
 }
@@ -196,7 +254,8 @@ class StatusActions {
 	printQueueActions() {
 		var queueActions = '<hr><button id="playQueue">play queue</button>'+
 			'<button>options</button>'+
-			'<button>effects</button>';
+			'<button>effects</button>'+
+			'<button id="shuffle">shuffle</button>';
 
 		this.element.innerHTML = queueActions;
 	}
@@ -258,19 +317,20 @@ $(document).ready(function() {
 		musicPanel.printDirContents(path);
 	});
 	$('#musicPanel').on('click', '.musicPanelFile', function() {
-		musicQueue.addToQueue($(this).text());
-		if (musicQueue.getPlayingEq() === -1) {
+		musicQueue.addToQueue(locationBar.getPath() + $(this).text());
+		if (musicQueue.playingEq === -1) {
 			statusActions.printQueueActions();
 		}
 	});
-	// TODO get ordered music, but add a button (in queueActions) to shuffle the pieces.
+
+	// TODO: function to find music
 	$('#actionsBar').on('click', '#addAll', function() {
-		getRandomMusic(locationBar.getPath()).then((randomMusic) => {
+		getAllMyMusic(locationBar.getPath()).then((allMyMusic) => {
 			var i;
-			for (i = 0; i < randomMusic.length; i++) {
-				musicQueue.addToQueue(randomMusic[i].replace(locationBar.getPath(), ''));
+			for (i = 0; i < allMyMusic.length; i++) {
+				musicQueue.addToQueue(allMyMusic[i]);
 			}
-			if (musicQueue.getPlayingEq() === -1) {
+			if (musicQueue.playingEq === -1) {
 				statusActions.printQueueActions();
 			}
 		}).catch((error) => {
@@ -285,6 +345,9 @@ $(document).ready(function() {
 			alert(error);
 		});
 		musicQueue.playQueued(0);
+	});
+	$('#statusActions').on('click', '#shuffle', function() {
+		musicQueue.shuffleQueue();
 	});
 	// TODO effects and sox options
 
@@ -301,7 +364,7 @@ $(document).ready(function() {
 			else
 				$('#playPause').text('pause');
 		});
-	})
+	});
 	$('#statusActions').on('click', '#stop', function() {
 		var action = 'stop';
 		$.post('./actions', {action: action}, function(data, status) {
@@ -312,9 +375,9 @@ $(document).ready(function() {
 
 			statusActions.printQueueActions();
 		});
-	})
+	});
 	$('#statusActions').on('click', '#next', function() {
-		var eq = musicQueue.getPlayingEq();
+		var eq = musicQueue.playingEq;
 		var action = 'stop';
 
 		$.post('./actions', {action: action}, function(data, status) {
@@ -328,16 +391,21 @@ $(document).ready(function() {
 			else
 				musicQueue.playQueued(eq + 1);
 		});
-	})
+	});
 	$('#statusActions').on('click', '#prev', function() {
-		var eq = musicQueue.getPlayingEq();
+		var eq = musicQueue.playingEq;
 
-		musicQueue.cleanPlaying();
+		musicQueue.deEmphasize(eq);
 		if (eq > 0) {
 			musicQueue.playQueued(eq - 1);
 		}else
 			musicQueue.playQueued(0);
-	})
+	});
+
+	$('#musicQueue').on('click', '.removeFromQueue', function() {
+		var eq = $(this).parent().parent().index();
+		musicQueue.removeFromQueue(eq);
+	});
 
 	openNav('myMusicNav');
 });
@@ -367,10 +435,10 @@ function getVolume() {
 }
 // }}}
 
-// playRandom {{{
-function getRandomMusic(path) {
+// getAllMyMusic {{{
+function getAllMyMusic(path) {
 	return new Promise((resolve, reject) => {
-		$.post('./randomMusic', {path: path}, function(data, status) {
+		$.post('./allMyMusic', {path: path}, function(data, status) {
 			if (status !== 'success')
 				reject(Error(status));
 			resolve(JSON.parse(data));
@@ -379,6 +447,7 @@ function getRandomMusic(path) {
 }
 // }}}
 
+// w3 functions {{{
 function w3_open() {
     document.getElementById("mySidebar").style.display = "block";
     document.getElementById("myOverlay").style.display = "block";
@@ -395,8 +464,11 @@ function openNav(id) {
 
 		locationBar.setPath(path);
 		musicPanel.printDirContents(path);
+    	document.getElementById('actionsBar').innerHTML = '<button id="addAll" class="w3-button w3-block">all of \'em</button>';
 	}else if (id === "myPlaylistsNav") {
 		locationBar.clear();
 		musicPanel.clear();
+    	document.getElementById('actionsBar').innerHTML = '';
 	}
 }
+// }}}
