@@ -3,7 +3,7 @@ class LocationBar {
 	// constructor
 	constructor(elementId) {
 		this.element = document.getElementById(elementId);
-		this.buttonClass = 'w3-button'
+		this.buttonClass = 'w3-bar-item w3-button'
 	}
 	// methods
 	setPath(path) {
@@ -83,7 +83,6 @@ class MusicPanel {
 						contents[i].contentName+'</li>\n';
 				}
 			}
-			content += '<li class="w3-padding-16 musicPanelRandom">Random</li>\n';
 			this.element.innerHTML = content;
 			
 			return i;
@@ -93,24 +92,6 @@ class MusicPanel {
 	}
 	clear() {
 		this.element.innerHTML = '';
-	}
-}
-// }}}
-
-// StatusMessage {{{
-class StatusMessage {
-	constructor(elementId) {
-		this.element = document.getElementById(elementId);
-		this.messageType = '';
-	}
-	clear() {
-		this.element.innerHTML = '';
-	}
-	appendMessage(message) {
-		this.element.innerHTML += message;
-	}
-	printMessage(message) {
-		this.element.innerHTML = message;
 	}
 }
 // }}}
@@ -253,7 +234,6 @@ $.get('./serverInfo', function(data, status) {
 $(document).ready(function() {
 	locationBar = new LocationBar('locationBar');
 	musicPanel = new MusicPanel('musicPanel');
-	statusMessage = new StatusMessage('statusMessage');
 	musicQueue = new MusicQueue('musicQueue');
 	statusProgress = new StatusProgress('statusProgress');
 	statusActions = new StatusActions('statusActions');
@@ -284,7 +264,7 @@ $(document).ready(function() {
 		}
 	});
 	// TODO get ordered music, but add a button (in queueActions) to shuffle the pieces.
-	$('#musicPanel').on('click', '.musicPanelRandom', function() {
+	$('#actionsBar').on('click', '#addAll', function() {
 		getRandomMusic(locationBar.getPath()).then((randomMusic) => {
 			var i;
 			for (i = 0; i < randomMusic.length; i++) {
@@ -418,6 +398,5 @@ function openNav(id) {
 	}else if (id === "myPlaylistsNav") {
 		locationBar.clear();
 		musicPanel.clear();
-		document.getElementById('actionsBar').innerHTML = '<button class="w3-button" onclick="playRandom()">Random</button>';
 	}
 }
