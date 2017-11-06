@@ -22,8 +22,7 @@
   <div id="locationBar" class="w3-bar w3-light-gray"></div>
   <ul class="w3-ul w3-large w3-hoverable" id="musicPanel"></ul>
   <hr/>
-  <div id="actionsBar" class="w3-bar">
-  </div>
+  <div id="actionsBar" class="w3-bar"></div>
 </div>
 </div>
 
@@ -35,18 +34,21 @@
   <i class="fa fa-bars w3-button w3-teal w3-xlarge" onclick="w3_open()"></i>
 </div>
 
-<header class="w3-container w3-theme w3-center w3-padding-16">
+<header class="w3-container w3-blue w3-center w3-padding-16">
   <h1 class="w3-xxxlarge">SoX Web</h1>
 </header>
 
-<div id="statusPanel" class="w3-container w3-padding-large w3-section w3-light-grey">
-  <div id="musicQueue"></div>
-  <div id="statusProgress" class="w3-container w3-large"></div>
-  <div id="statusActions" class="w3-container w3-large"></div>
-</div>
+<div id="musicQueue" style="margin-bottom:60px"></div>
 
-<footer class="w3-container w3-padding-large w3-light-grey w3-justify w3-opacity">
-	<p>just listen</p>
+<footer class="w3-container w3-padding-8 w3-light-grey w3-bottom" style="height:60px; width:61.8%">
+  <div id="statusActions" class="w3-container w3-padding w3-bar">
+    <button id="playPause" class="w3-button">play</button>
+    <button id="prev" class="w3-button">prev</button>
+    <button id="stop" class="w3-button">stop</button>
+    <button id="next" class="w3-button">next</button>
+    <button id="shuffle" class="w3-button">shuffle</button>
+    <span class="w3-right">volume: <input type="range" min="0" max="100" step="3" value="0" class="slider" id="volumeSlider"></span>
+  </div>
 </footer>
 
 </div>

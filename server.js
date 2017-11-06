@@ -15,7 +15,7 @@ const WebSocket = require('/usr/lib/node_modules/ws')
 
 // Config
 // TODO: config file
-const baseMusicPath = '/mnt/media/music/'
+const baseMusicPath = '/home/fmarotta/Music/'
 const serverIp = ip.address()
 const serverPort = 3001
 

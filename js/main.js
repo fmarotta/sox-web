@@ -96,25 +96,6 @@ class MusicPanel {
 }
 // }}}
 
-// StatusProgress {{{
-class StatusProgress {
-	constructor(elementId) {
-		this.element = document.getElementById(elementId);
-	}
-	printProgress(progress) {
-		if (progress === undefined) {
-			this.element.innerHTML = '';
-			return;
-		}
-		// progress
-		this.element.innerHTML = progress;
-	}
-	clear() {
-		this.element.innerHTML = '';
-	}
-}
-// }}}
-
 // MusicQueue {{{
 class MusicQueue {
 	constructor(elementId) {
@@ -124,39 +105,52 @@ class MusicQueue {
 	getLastEq() {
 		return $('#musicQueue span').length - 1;
 	}
-	clear() {
-		this.element.innerHTML = '';
-	}
 	addToQueue(path) {
 		this.element.innerHTML += '<span class="w3-panel">\n'+
 			'<header class="w3-container w3-teal cardHeader">'+
 				'<h4>'+path+'</h4></header>\n'+
-			'<div class="w3-container w3-white cardBody"></div>\n'+
-			'<footer class="w3-container w3-teal w3-bar cardFooter">'+
-				'<button class="w3-btn w3-small">TODO: effects</button>'+
-				'<button class="w3-btn w3-circle w3-red w3-right w3-tiny removeFromQueue">-</button></footer>\n'+
+			'<div class="w3-container w3-white cardBody" style="padding:0"></div>\n'+
+			'<div class="w3-container w3-white cardProgress" style="padding:0"></div>\n'+
+			'<footer class="w3-display-container w3-teal w3-bar cardFooter">'+
+				'<button class="w3-button w3-small">TODO: effects</button>'+
+				'<button class="w3-button w3-display-right w3-tiny removeFromQueue"><i class="fa fa-close"></i></button></footer>\n'+
 			'</span>';
 	}
 	removeFromQueue(eq) {
-		$('#musicQueue span:eq('+eq+')').remove();
-		if (this.getLastEq() === -1)
-			statusActions.clear();
+		if (this.playingEq === eq) {
+			var action = 'stop';
+			$.post('./actions', {action: action}, function(data, status) {
+				if (status !== 'success')
+					alert('Error: ' + status);
+				if (JSON.parse(data) !== 'OK')
+					console.log('Something went wrong');
+
+				$('#musicQueue span:eq('+eq+')').remove();
+				$('#playPause').text('play');
+			});
+		}else {
+			$('#musicQueue span:eq('+eq+')').remove();
+		}
 	}
 	emphasize(eq) {
 		$('#musicQueue span:eq('+eq+') header').attr('class', 'w3-container w3-green cardHeader');
-		$('#musicQueue span:eq('+eq+') footer').attr('class', 'w3-container w3-green cardHeader');
+		$('#musicQueue span:eq('+eq+') footer').attr('class', 'w3-container w3-green cardFooter');
 	}
 	deEmphasize(eq) {
 		$('#musicQueue span:eq('+eq+') header').attr('class', 'w3-container w3-teal cardHeader');
-		$('#musicQueue span:eq('+eq+') footer').attr('class', 'w3-container w3-teal cardHeader');
+		$('#musicQueue span:eq('+eq+') footer').attr('class', 'w3-container w3-teal cardFooter');
 		this.clearBody(eq);
 		this.playingEq = -1;
 	}
 	addBody(eq, line) {
-		var text = $('#musicQueue span:eq('+eq+') div').html();
-		$('#musicQueue span:eq('+eq+') div').html(text + line + '<br/>\n');
+		var text = $('#musicQueue span:eq('+eq+') .cardBody').html();
+		$('#musicQueue span:eq('+eq+') .cardBody').html(text + line + '<br/>\n');
+	}
+	printProgress(eq, line) {
+		$('#musicQueue span:eq('+eq+') .cardProgress').html('</br>'+line+'\n');
 	}
 	clearBody(eq) {
+		// it also clear the progress
 		$('#musicQueue span:eq('+eq+') div').html('');
 	}
 	shuffleQueue() {
@@ -217,17 +211,16 @@ class MusicQueue {
 	}
 	sortOutput(eq, line) {
 		if (/In:[0-9]*\.[0-9]*/.test(line)) {
-			statusProgress.printProgress(line.replace(/ /g, '&nbsp;'));
+			musicQueue.printProgress(eq, line.replace(/ /g, '&nbsp;'));
 		}else if (line.match(/Done\./)) {
 			this.deEmphasize(eq);
-			statusProgress.clear();
 			if (eq === this.getLastEq())
-				statusActions.printQueueActions();
+				$('#playPause').text('play');
 			else
 				this.playQueued(eq + 1);
 		}else if (line.match(/Stopped\./)) {
 			this.deEmphasize(eq);
-			statusProgress.clear();
+			$('#playPause').text('play');
 		}else if (/\S/.test(line) && !line.match(/(Aborted|Skipped)/)) {
 			if (/\//.test(line)) {
 				;
@@ -237,46 +230,13 @@ class MusicQueue {
 		}else if (/\S/.test(line) && line.match(/(Aborted|Skipped)/)) {
 			console.log('Aborted/Skipped');
 			this.deEmphasize(eq);
-			statusProgress.clear();
+			$('#playPause').text('play');
 		}else if (/\S/.test(line)) {
 			alert(line);
 		}
 	}
-}
-// }}}
-
-// StatusActions {{{
-class StatusActions {
-	constructor(elementId) {
-		this.element = document.getElementById(elementId);
-	}
 	clear() {
 		this.element.innerHTML = '';
-	}
-	printQueueActions() {
-		var queueActions = '<hr><button id="playQueue">play queue</button>'+
-			'<button>options</button>'+
-			'<button>effects</button>'+
-			'<button id="shuffle">shuffle</button>';
-
-		this.element.innerHTML = queueActions;
-	}
-	printSoxActions(volume) {
-		// actions
-		this.element.innerHTML = '<hr><button id="playPause">pause</button>'+
-			'<button id="prev">prev</button>'+
-			'<button id="stop">stop</button>'+
-			'<button id="next">next</button>'+
-			'<span style="float:right">volume: <input type="range" min="0" max="100" step="3" '+
-			'value='+volume+' class="slider" id="volumeSlider"></span>';
-
-		// volume slider
-		document.getElementById('volumeSlider').oninput = function() {
-			$.post('./volume', {vol: this.value}, function(data, status) {
-				if (status !== 'success')
-					alert('Error: ' + status);
-			});
-		}
 	}
 }
 // }}}
@@ -296,8 +256,18 @@ $(document).ready(function() {
 	locationBar = new LocationBar('locationBar');
 	musicPanel = new MusicPanel('musicPanel');
 	musicQueue = new MusicQueue('musicQueue');
-	statusProgress = new StatusProgress('statusProgress');
-	statusActions = new StatusActions('statusActions');
+
+	getVolume().then((volume) => {
+		document.getElementById('volumeSlider').value = Math.round(volume);
+	}).catch((error) => {
+		alert(error);
+	});
+	document.getElementById('volumeSlider').oninput = function() {
+		$.post('./volume', {vol: this.value}, function(data, status) {
+			if (status !== 'success')
+				alert('Error: ' + status);
+		});
+	}
 
 	$('#locationBar').on('click', 'button', function() {
 		var path = locationBar.getPathUpTo($(this).attr('id'));
@@ -320,9 +290,6 @@ $(document).ready(function() {
 	});
 	$('#musicPanel').on('click', '.musicPanelFile', function() {
 		musicQueue.addToQueue(locationBar.getPath() + $(this).text());
-		if (musicQueue.playingEq === -1) {
-			statusActions.printQueueActions();
-		}
 	});
 
 	// TODO: function to find music
@@ -332,42 +299,40 @@ $(document).ready(function() {
 			for (i = 0; i < allMyMusic.length; i++) {
 				musicQueue.addToQueue(allMyMusic[i]);
 			}
-			if (musicQueue.playingEq === -1) {
-				statusActions.printQueueActions();
-			}
 		}).catch((error) => {
 			alert(error);
 		});
 	});
 
-	$('#statusActions').on('click', '#playQueue', function() {
-		getVolume().then((volume) => {
-			statusActions.printSoxActions(volume);
-		}).catch((error) => {
-			alert(error);
-		});
-		musicQueue.playQueued(0);
-	});
-	$('#statusActions').on('click', '#shuffle', function() {
-		musicQueue.shuffleQueue();
-	});
 	// TODO effects and sox options
-
 	$('#statusActions').on('click', '#playPause', function() {
-		var action = $(this).text();
-		$.post('./actions', {action: action}, function(data, status) {
-			if (status !== 'success')
-				alert('Error: ' + status);
-			if (JSON.parse(data) !== 'OK')
-				console.log('Something went wrong');
+		var eq = musicQueue.playingEq;
+		var lastEq = musicQueue.getLastEq();
 
-			if (action === 'pause')
-				$('#playPause').text('play');
-			else
-				$('#playPause').text('pause');
-		});
+		if (eq === -1 && lastEq === -1)
+			return;
+		else if (eq === -1 && lastEq !== -1)
+			musicQueue.playQueued(0);
+		else {
+			var action = $(this).text();
+			$.post('./actions', {action: action}, function(data, status) {
+				if (status !== 'success')
+					alert('Error: ' + status);
+				if (JSON.parse(data) !== 'OK')
+					console.log('Something went wrong');
+			});
+		}
+
+		if (action === 'pause')
+			$('#playPause').text('play');
+		else
+			$('#playPause').text('pause');
 	});
 	$('#statusActions').on('click', '#stop', function() {
+		var eq = musicQueue.playingEq;
+		if (eq === -1)
+			return;
+
 		var action = 'stop';
 		$.post('./actions', {action: action}, function(data, status) {
 			if (status !== 'success')
@@ -375,33 +340,49 @@ $(document).ready(function() {
 			if (JSON.parse(data) !== 'OK')
 				console.log('Something went wrong');
 
-			statusActions.printQueueActions();
+			$('#playPause').text('play');
 		});
 	});
 	$('#statusActions').on('click', '#next', function() {
 		var eq = musicQueue.playingEq;
-		var action = 'stop';
+		if (eq === -1)
+			return;
 
+		var action = 'stop';
 		$.post('./actions', {action: action}, function(data, status) {
 			if (status !== 'success')
 				alert('Error: ' + status);
 			if (JSON.parse(data) !== 'OK')
 				console.log('Something went wrong');
 
+			musicQueue.deEmphasize(eq);
 			if (eq === musicQueue.getLastEq())
-				statusActions.printQueueActions();
+				$('#playPause').text('play');
 			else
 				musicQueue.playQueued(eq + 1);
 		});
 	});
 	$('#statusActions').on('click', '#prev', function() {
 		var eq = musicQueue.playingEq;
+		if (eq === -1)
+			return;
 
-		musicQueue.deEmphasize(eq);
-		if (eq > 0) {
-			musicQueue.playQueued(eq - 1);
-		}else
-			musicQueue.playQueued(0);
+		var action = 'stop';
+		$.post('./actions', {action: action}, function(data, status) {
+			if (status !== 'success')
+				alert('Error: ' + status);
+			if (JSON.parse(data) !== 'OK')
+				console.log('Something went wrong');
+
+			musicQueue.deEmphasize(eq);
+			if (eq > 0) {
+				musicQueue.playQueued(eq - 1);
+			}else
+				musicQueue.playQueued(0);
+		});
+	});
+	$('#statusActions').on('click', '#shuffle', function() {
+		musicQueue.shuffleQueue();
 	});
 
 	$('#musicQueue').on('click', '.removeFromQueue', function() {
@@ -415,20 +396,9 @@ $(document).ready(function() {
 
 // getMyMusic {{{
 function getDirContents(path) {
+	// FIXME useless promise here, should settle with jQuery's callback...
 	return new Promise((resolve, reject) => {
 		$.post('./myMusicDir', {path: path}, function(data, status) {
-			if (status !== 'success')
-				reject(Error(status));
-			resolve(JSON.parse(data));
-		});
-	});
-}
-// }}}
-
-// getVolume {{{
-function getVolume() {
-	return new Promise((resolve, reject) => {
-		$.get('./volume', function(data, status) {
 			if (status !== 'success')
 				reject(Error(status));
 			resolve(JSON.parse(data));
@@ -449,14 +419,29 @@ function getAllMyMusic(path) {
 }
 // }}}
 
+// getVolume {{{
+function getVolume() {
+	return new Promise((resolve, reject) => {
+		$.get('./volume', function(data, status) {
+			if (status !== 'success')
+				reject(Error(status));
+			resolve(JSON.parse(data));
+		});
+	});
+}
+// }}}
+
 // w3 functions {{{
 function w3_open() {
+	// FIXME: when I increase the window size with the sidebar open, the width remains 61.8%
     document.getElementById("mySidebar").style.display = "block";
+    document.getElementById("mySidebar").style.width = "61.8%";
     document.getElementById("myOverlay").style.display = "block";
 }
 
 function w3_close() {
     document.getElementById("mySidebar").style.display = "none";
+    document.getElementById("mySidebar").style.width = "38.2%";
     document.getElementById("myOverlay").style.display = "none";
 }
 
