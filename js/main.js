@@ -129,10 +129,10 @@ class MusicQueue {
 	}
 	addToQueue(path) {
 		this.element.innerHTML += '<span class="w3-panel">\n'+
-			'<header class="w3-container w3-blue cardHeader">'+
+			'<header class="w3-container w3-teal cardHeader">'+
 				'<h4>'+path+'</h4></header>\n'+
-			'<div class="w3-container w3-white" cardBody"></div>\n'+
-			'<footer class="w3-container w3-blue w3-bar cardFooter">'+
+			'<div class="w3-container w3-white cardBody"></div>\n'+
+			'<footer class="w3-container w3-teal w3-bar cardFooter">'+
 				'<button class="w3-btn w3-small">TODO: effects</button>'+
 				'<button class="w3-btn w3-circle w3-red w3-right w3-tiny removeFromQueue">-</button></footer>\n'+
 			'</span>';
@@ -147,8 +147,8 @@ class MusicQueue {
 		$('#musicQueue span:eq('+eq+') footer').attr('class', 'w3-container w3-green cardHeader');
 	}
 	deEmphasize(eq) {
-		$('#musicQueue span:eq('+eq+') header').attr('class', 'w3-container w3-blue cardHeader');
-		$('#musicQueue span:eq('+eq+') footer').attr('class', 'w3-container w3-blue cardHeader');
+		$('#musicQueue span:eq('+eq+') header').attr('class', 'w3-container w3-teal cardHeader');
+		$('#musicQueue span:eq('+eq+') footer').attr('class', 'w3-container w3-teal cardHeader');
 		this.clearBody(eq);
 		this.playingEq = -1;
 	}
@@ -188,12 +188,14 @@ class MusicQueue {
 
 	}
 	playQueued(eq) {
-		// check if eq is valid
 		this.playingEq = eq;
 		this.emphasize(eq);
 
 		var path = $('#musicQueue span:eq('+eq+') header').text();
 		var queue = 'queue:\'baseMusicPath/'+path+'\'';
+
+		if ($('#statusActions #playPause').text() === 'play')
+			$('#statusActions #playPause').text('pause');
 
 		// connect to web socket
 		var connection = new WebSocket(soxServer, ['soap', 'xmpp']);
