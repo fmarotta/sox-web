@@ -111,9 +111,13 @@ class MusicQueue {
 				'<h4>'+path+'</h4></header>\n'+
 			'<div class="w3-container w3-white cardBody" style="padding:0"></div>\n'+
 			'<div class="w3-container w3-white cardProgress" style="padding:0"></div>\n'+
-			'<footer class="w3-display-container w3-teal w3-bar cardFooter">'+
-				'<button class="w3-button w3-small">TODO: effects</button>'+
-				'<button class="w3-button w3-display-right w3-tiny removeFromQueue"><i class="fa fa-close"></i></button></footer>\n'+
+			'<footer class="w3-display-container w3-teal w3-bar cardFooter">\n'+
+				'<div class="w3-container w3-bar w3-small effects">TODO: effects</div>\n'+
+				'<div class="w3-container w3-bar w3-display-right">'+
+					'<button class="w3-button w3-right w3-tiny removeFromQueue"><i class="fa fa-close"></i></button>'+
+					'<button class="w3-button w3-right w3-tiny playFromQueue"><i class="fa fa-caret-right"></i></button>'+
+				'</div>\n'+
+			'</footer>\n'+
 			'</span>';
 	}
 	removeFromQueue(eq) {
@@ -134,11 +138,11 @@ class MusicQueue {
 	}
 	emphasize(eq) {
 		$('#musicQueue span:eq('+eq+') header').attr('class', 'w3-container w3-green cardHeader');
-		$('#musicQueue span:eq('+eq+') footer').attr('class', 'w3-container w3-green cardFooter');
+		$('#musicQueue span:eq('+eq+') footer').attr('class', 'w3-display-container w3-bar w3-green cardFooter');
 	}
 	deEmphasize(eq) {
 		$('#musicQueue span:eq('+eq+') header').attr('class', 'w3-container w3-teal cardHeader');
-		$('#musicQueue span:eq('+eq+') footer').attr('class', 'w3-container w3-teal cardFooter');
+		$('#musicQueue span:eq('+eq+') footer').attr('class', 'w3-display-container w3-bar w3-teal cardFooter');
 		this.clearBody(eq);
 		this.playingEq = -1;
 	}
@@ -151,7 +155,8 @@ class MusicQueue {
 	}
 	clearBody(eq) {
 		// it also clear the progress
-		$('#musicQueue span:eq('+eq+') div').html('');
+		$('#musicQueue span:eq('+eq+') .cardBody').html('');
+		$('#musicQueue span:eq('+eq+') .cardProgress').html('');
 	}
 	shuffleQueue() {
 		var i;
@@ -386,8 +391,28 @@ $(document).ready(function() {
 	});
 
 	$('#musicQueue').on('click', '.removeFromQueue', function() {
-		var eq = $(this).parent().parent().index();
+		var eq = $(this).parent().parent().parent().index();
 		musicQueue.removeFromQueue(eq);
+	});
+	$('#musicQueue').on('click', '.playFromQueue', function() {
+		var eq = musicQueue.playingEq;
+		var newEq = $(this).parent().parent().parent().index();
+
+		if (eq === -1) {
+			musicQueue.playQueued(newEq);
+		}else {
+			var action = 'stop';
+			$.post('./actions', {action: action}, function(data, status) {
+				if (status !== 'success')
+					alert('Error: ' + status);
+				if (JSON.parse(data) !== 'OK')
+					console.log('Something went wrong');
+
+				musicQueue.deEmphasize(eq);
+				musicQueue.playQueued(newEq);
+			});
+		}
+		$('#playPause').text('pause');
 	});
 
 	openNav('myMusicNav');
