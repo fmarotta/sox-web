@@ -148,7 +148,7 @@ wss.on('connection', function connection(ws, req) {
 			try {
 				// SIGTERM is not noticed by pty.on('exit'); that is, the
 				// resulting signal is 0.
-				process.kill(pty.pid, 'SIGSTOP')
+				//process.kill(pty.pid, 'SIGSTOP')
 				process.kill(pty.pid, 'SIGTERM')
 				pty = null
 			}catch (e) {
@@ -165,16 +165,23 @@ wss.on('connection', function connection(ws, req) {
 				env: getEnv()
 			})
 			pty.on('data', function(data) {
-				ws.send(data)
+				ws.send(data, function(error) {
+					console.log('error: web socket closed before the message was sent.' + error)
+				})
 			})
 			pty.on('exit', function(code, signal) {
-				//console.log('code: '+code+' signal: '+signal)
 				if (signal == 9)
-					ws.send('Stopped.')
+					ws.send('Stopped.', function (error) {
+						console.log('error: web socket closed before the message was sent.' + error)
+					})
 				ws.terminate()
 			})
 		}else {
 		}
+	})
+
+	ws.on('close', function() {
+		//console.log('disconnected')
 	})
 })
 // }}}
