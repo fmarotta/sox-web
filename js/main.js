@@ -90,6 +90,22 @@ class MusicPanel {
 			alert(error);
 		});
 	}
+	printRadios() {
+		getRadios().then((stations) => {
+			var i;
+			var content = '';
+
+			for (i = 0; i < stations.length; i++)
+				content += '<li id="'+stations[i].stationUrl+'" '+
+					'class="w3-padding-16 musicPanelRadio">'+
+					stations[i].stationName+'</li>\n';
+			this.element.innerHTML = content;
+
+			return i;
+		}).catch((error) => {
+			alert(error);
+		});
+	}
 	clear() {
 		this.element.innerHTML = '';
 	}
@@ -190,8 +206,14 @@ class MusicQueue {
 		this.playingEq = eq;
 		this.emphasize(eq);
 
+		var queue;
 		var path = $('#musicQueue span:eq('+eq+') header').text();
-		var queue = 'queue:\'baseMusicPath/'+path+'\'';
+		if (/https?:\/\//.test(path)) {
+			queue = 'radio:\''+path+'\'';
+			console.log(queue);
+		}else {
+			queue = 'queue:\'baseMusicPath/'+path+'\'';
+		}
 
 		if ($('#statusActions #playPause').text() === 'play')
 			$('#statusActions #playPause').text('pause');
@@ -295,6 +317,9 @@ $(document).ready(function() {
 	});
 	$('#musicPanel').on('click', '.musicPanelFile', function() {
 		musicQueue.addToQueue(locationBar.getPath() + $(this).text());
+	});
+	$('#musicPanel').on('click', '.musicPanelRadio', function() {
+		musicQueue.addToQueue($(this).attr('id'));
 	});
 
 	// TODO: function to find music
@@ -419,9 +444,8 @@ $(document).ready(function() {
 });
 // }}}
 
-// getMyMusic {{{
+// getDirContents {{{
 function getDirContents(path) {
-	// FIXME useless promise here, should settle with jQuery's callback...
 	return new Promise((resolve, reject) => {
 		$.post('./myMusicDir', {path: path}, function(data, status) {
 			if (status !== 'success')
@@ -436,6 +460,18 @@ function getDirContents(path) {
 function getAllMyMusic(path) {
 	return new Promise((resolve, reject) => {
 		$.post('./allMyMusic', {path: path}, function(data, status) {
+			if (status !== 'success')
+				reject(Error(status));
+			resolve(JSON.parse(data));
+		});
+	});
+}
+// }}}
+
+// getRadios {{{
+function getRadios() {
+	return new Promise((resolve, reject) => {
+		$.get('./radios', function(data, status) {
 			if (status !== 'success')
 				reject(Error(status));
 			resolve(JSON.parse(data));
@@ -480,6 +516,10 @@ function openNav(id) {
 	}else if (id === "myPlaylistsNav") {
 		locationBar.clear();
 		musicPanel.clear();
+    	document.getElementById('actionsBar').innerHTML = '';
+	}else if (id === "radioNav") {
+		locationBar.clear();
+		musicPanel.printRadios();
     	document.getElementById('actionsBar').innerHTML = '';
 	}
 }

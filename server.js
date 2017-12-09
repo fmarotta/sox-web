@@ -15,7 +15,7 @@ const WebSocket = require('/usr/lib/node_modules/ws')
 
 // Config
 // TODO: config file
-const baseMusicPath = '/mnt/media/music/'
+const baseMusicPath = '/home/fmarotta/Music/'
 const serverIp = ip.address()
 const serverPort = 3001
 
@@ -53,6 +53,19 @@ app.post('/myMusicDir', function(req, res) {
 	}).catch((error) => {
 		console.log(error)
 	})
+})
+
+app.get('/radios', function(req, res) {
+	var contents = []
+
+	contents[0] = new Object
+	contents[0].stationName = 'BBC World Service'
+	contents[0].stationUrl = 'http://bbcwssc.ic.llnwd.net/stream/bbcwssc_mp1_ws-einws'
+	contents[1] = new Object
+	contents[1].stationName = 'Star Talk'
+	contents[1].stationUrl = 'http://tunein.streamguys1.com/StarTalkRadio?aw_0_1st.playerid=RadioTime&aw_0_1st.skey=1512841995'
+
+	res.json(JSON.stringify(contents))
 })
 
 app.get('/serverInfo', function(req, res) {
@@ -173,7 +186,36 @@ wss.on('connection', function connection(ws, req) {
 					ws.send('Stopped.')
 				ws.terminate()
 			})
-		}else {
+		}else if (message.match('radio:')) {
+			try {
+				// SIGTERM is not noticed by pty.on('exit'); that is, the
+				// resulting signal is 0.
+				process.kill(pty.pid, 'SIGSTOP')
+				process.kill(pty.pid, 'SIGTERM')
+				pty = null
+			}catch (e) {
+				// TODO
+			}
+			
+			var url = message.replace('radio:', '')
+			process.exit;
+			pty = Pty.spawn('/bin/bash', ['-c', 'mplayer -quiet '+url], {
+				name: 'dumb',
+				cols: 256,
+				rows: 16,
+				cwd: process.cwd(),
+				env: getEnv()
+			})
+			pty.on('data', function(data) {
+				if (!/Cache/.test(data))
+					ws.send(data)
+			})
+			pty.on('exit', function(code, signal) {
+				//console.log('code: '+code+' signal: '+signal)
+				if (signal == 9)
+					ws.send('Stopped.')
+				ws.terminate()
+			})
 		}
 	})
 })
