@@ -200,7 +200,6 @@ class MusicQueue {
 		for (i = 0; i < queue.length; i++) {
 			this.addToQueue(queue[i]);
 		}
-
 	}
 	playQueued(eq) {
 		this.playingEq = eq;
@@ -210,7 +209,6 @@ class MusicQueue {
 		var path = $('#musicQueue span:eq('+eq+') header').text();
 		if (/https?:\/\//.test(path)) {
 			queue = 'radio:\''+path+'\'';
-			console.log(queue);
 		}else {
 			queue = 'queue:\'baseMusicPath/'+path+'\'';
 		}
@@ -223,23 +221,30 @@ class MusicQueue {
 		connection.onopen = function() {
 			connection.send(queue);
 		};
-		connection.onmessage = function (e) {
+		connection.onmessage = function(e) {
 			if (/\n/.test(e.data)) {
 				var i;
 				var lines = e.data.split(/\n/);
 				for (i = 0; i < lines.length; i++) {
 					// NOTE: `this' is not the music queue in the scope of this function, I can't use it.
-					musicQueue.sortOutput(eq, lines[i]);
+					musicQueue.sortOutput(eq, lines[i], connection);
 				}
 			}else {
-				musicQueue.sortOutput(eq, e.data);
+				musicQueue.sortOutput(eq, e.data, connection);
 			}
 		};
+		connection.onclose = function() {
+			// It is often too late for the server to be warned
+		};
+		connection.onerror = function(err) {
+			console.log(err);
+		};
 	}
-	sortOutput(eq, line) {
+	sortOutput(eq, line, connection) {
 		if (/In:[0-9]*\.[0-9]*/.test(line)) {
 			musicQueue.printProgress(eq, line.replace(/ /g, '&nbsp;'));
 		}else if (line.match(/Done\./)) {
+			connection.close();
 			this.deEmphasize(eq);
 			if (eq === this.getLastEq())
 				$('#playPause').text('play');

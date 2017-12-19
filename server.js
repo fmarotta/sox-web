@@ -158,25 +158,9 @@ wss.on('connection', function connection(ws, req) {
 
 	ws.on('message', function incoming(message) {
 		if (message.match('queue:')) {
-			try {
-				// SIGTERM is not noticed by pty.on('exit'); that is, the
-				// resulting signal is 0.
-				process.kill(pty.pid, 'SIGSTOP')
-				process.kill(pty.pid, 'SIGTERM')
-				pty = null
-			}catch (e) {
-				// TODO
-			}
-
 			var path = message.replace('queue:', '').replace(/baseMusicPath\//g, baseMusicPath)
-			process.exit;
-			pty = Pty.spawn('/bin/bash', ['-c', 'play '+path], {
-				name: 'dumb',
-				cols: 256,
-				rows: 16,
-				cwd: process.cwd(),
-				env: getEnv()
-			})
+			serverExec(['-c', 'play '+path])
+
 			pty.on('data', function(data) {
 				ws.send(data)
 			})
@@ -184,28 +168,14 @@ wss.on('connection', function connection(ws, req) {
 				//console.log('code: '+code+' signal: '+signal)
 				if (signal == 9)
 					ws.send('Stopped.')
-				ws.terminate()
+				// wait for the client to close the connection
+				//ws.terminate()
+				pty = null
 			})
 		}else if (message.match('radio:')) {
-			try {
-				// SIGTERM is not noticed by pty.on('exit'); that is, the
-				// resulting signal is 0.
-				process.kill(pty.pid, 'SIGSTOP')
-				process.kill(pty.pid, 'SIGTERM')
-				pty = null
-			}catch (e) {
-				// TODO
-			}
-			
 			var url = message.replace('radio:', '')
-			process.exit;
-			pty = Pty.spawn('/bin/bash', ['-c', 'mplayer -quiet '+url], {
-				name: 'dumb',
-				cols: 256,
-				rows: 16,
-				cwd: process.cwd(),
-				env: getEnv()
-			})
+			serverExec(['-c', 'mplayer -quiet '+url])
+
 			pty.on('data', function(data) {
 				if (!/Cache/.test(data))
 					ws.send(data)
@@ -214,9 +184,13 @@ wss.on('connection', function connection(ws, req) {
 				//console.log('code: '+code+' signal: '+signal)
 				if (signal == 9)
 					ws.send('Stopped.')
-				ws.terminate()
+				pty = null
 			})
 		}
+	})
+	ws.on('close', function() {
+		process.kill(pty.pid, 'SIGTERM')
+		pty = null
 	})
 })
 // }}}
@@ -283,6 +257,29 @@ function getDirContents(path) {
 
 			resolve(contents)
 		})
+	})
+}
+
+function serverExec(command) {
+	if (pty !== null) {
+		try {
+			// SIGTERM is not noticed by pty.on('exit'); that is, the
+			// resulting signal is 0.
+			//process.kill(pty.pid, 'SIGSTOP')
+			process.kill(pty.pid, 'SIGTERM')
+			pty = null
+		}catch (e) {
+			console.log(e)
+			// TODO
+		}
+	}
+
+	pty = Pty.spawn('/bin/bash', command, {
+		name: 'dumb',
+		cols: 256,
+		rows: 16,
+		cwd: process.cwd(),
+		env: getEnv()
 	})
 }
 // }}}
