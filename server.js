@@ -162,12 +162,17 @@ wss.on('connection', function connection(ws, req) {
 			serverExec(['-c', 'play '+path])
 
 			pty.on('data', function(data) {
-				ws.send(data)
+				ws.send(data, function(error) {
+					if (error)
+						console.log('error: web socket closed before the data was sent.' + error)
+				})
 			})
 			pty.on('exit', function(code, signal) {
-				//console.log('code: '+code+' signal: '+signal)
 				if (signal == 9)
-					ws.send('Stopped.')
+					ws.send('Stopped.', function (error) {
+						if (error)
+							console.log('error: web socket closed before the exit code was sent.\n' + error)
+					})
 				// wait for the client to close the connection
 				//ws.terminate()
 				pty = null
@@ -179,6 +184,9 @@ wss.on('connection', function connection(ws, req) {
 			pty.on('data', function(data) {
 				if (!/Cache/.test(data))
 					ws.send(data)
+				//if (/source disconnected/.test(data)) {
+					//kill the process.
+				//}
 			})
 			pty.on('exit', function(code, signal) {
 				//console.log('code: '+code+' signal: '+signal)
