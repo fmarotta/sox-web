@@ -15,7 +15,8 @@ const WebSocket = require('/usr/lib/node_modules/ws')
 
 // Config
 // TODO: config file
-const baseMusicPath = '/home/fmarotta/Music/'
+const logFile = '/home/fmarotta/sox-web/log/server.log'
+const baseMusicPath = '/mnt/media/music/'
 const serverIp = ip.address()
 const serverPort = 3001
 
@@ -64,6 +65,9 @@ app.get('/radios', function(req, res) {
 	contents[1] = new Object
 	contents[1].stationName = 'Star Talk'
 	contents[1].stationUrl = 'http://tunein.streamguys1.com/StarTalkRadio?aw_0_1st.playerid=RadioTime&aw_0_1st.skey=1512841995'
+	contents[2] = new Object
+	contents[2].stationName = 'Rai Radio 1'
+	contents[2].stationUrl = 'http://icestreaming.rai.it/1.mp3'
 
 	res.json(JSON.stringify(contents))
 })
@@ -179,7 +183,7 @@ wss.on('connection', function connection(ws, req) {
 			})
 		}else if (message.match('radio:')) {
 			var url = message.replace('radio:', '')
-			serverExec(['-c', 'mplayer -quiet '+url])
+			serverExec(['-c', 'play -t mp3 "|wget -q -o '+logFile+' -O - '+url+'"'])
 
 			pty.on('data', function(data) {
 				if (!/Cache/.test(data))
@@ -197,8 +201,10 @@ wss.on('connection', function connection(ws, req) {
 		}
 	})
 	ws.on('close', function() {
-		process.kill(pty.pid, 'SIGTERM')
-		pty = null
+		try {
+			process.kill(pty.pid, 'SIGTERM')
+			pty = null
+		}catch (e) {}
 	})
 })
 // }}}
