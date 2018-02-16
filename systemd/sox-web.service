@@ -1,0 +1,11 @@
+[Unit]
+Description=Start a server for sox_web
+
+[Service]
+Type=simple
+Restart=on-failure
+RemainAfterExit=no
+ExecStart=/bin/bash -c '/usr/bin/node /home/fmarotta/sox-web/server.js &>> /home/fmarotta/sox-web/log/server.log'
+
+[Install]
+WantedBy=default.target
