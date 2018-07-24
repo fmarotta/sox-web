@@ -12,6 +12,7 @@ const http = require('http')
 const ip = require('/usr/lib/node_modules/ip')
 const Pty = require('/usr/lib/node_modules/node-pty')
 const WebSocket = require('/usr/lib/node_modules/ws')
+const winston = require('../node_modules/winston')
 
 // Config
 // TODO: config file
@@ -20,12 +21,31 @@ const baseMusicPath = '/mnt/media/music/'
 const serverIp = ip.address()
 const serverPort = 3001
 
+// Logging
+const logger = winston.createLogger({
+    exitOnError: true,
+    transports: [
+        new winston.transports.File({
+            filename: logFile,
+            level: 'info',
+            format: winston.format.combine(
+                winston.format.timestamp(),
+                winston.format.json()
+            )
+        }),
+        new winston.transports.Console({
+            level: 'debug',
+            format: winston.format.simple()
+        })
+    ]
+})
+
 // Initializations
 const app = express()
 const server = http.createServer(app)
 const wss = new WebSocket.Server({server})
 server.listen(serverPort, function() {
-	//console.log("Server listening on port "+serverPort)
+	//logger.info("Server listening on port "+serverPort)
 })
 
 var pty = null
@@ -52,7 +72,7 @@ app.post('/myMusicDir', function(req, res) {
 	getDirContents(path).then((contents) => {
 		res.json(JSON.stringify(contents))
 	}).catch((error) => {
-		console.log(error)
+		logger.info(error)
 	})
 })
 
@@ -92,7 +112,7 @@ app.post('/allMyMusic', function(req, res) {
 		allMyMusic = allMyMusic.split('\n').slice(0, -1)
 		res.json(JSON.stringify(allMyMusic))
 	}).catch((error) => {
-		console.log(error)
+		logger.info(error)
 	})
 })
 
@@ -108,14 +128,14 @@ app.get('/volume', function(req, res) {
 	volumePromise.then(function(volume) {
 		res.json(JSON.stringify(volume))
 	}).catch(function(error) {
-		console.log(Error(error))
+		logger.info(Error(error))
 	})
 })
 
 app.post('/volume', function(req, res) {
 	var sinkvol = child_process.exec('pactl set-sink-volume @DEFAULT_SINK@ '+req.body.vol+'%', function(error, stdout, stderr) {
 		if (error)
-			console.log(error)
+			logger.info(error)
 		res.json(JSON.stringify('OK'))
 	})
 })
@@ -151,14 +171,14 @@ app.post('/actions', function(req, res) {
 			break
 		default:
 			res.json(JSON.stringify('I did not understand'))
-			console.log('did not understand action')
+			logger.info('did not understand action')
 	}
 })
 // }}}
 
 // Web Socket {{{
 wss.on('connection', function connection(ws, req) {
-	//console.log(req.url)
+	//logger.info(req.url)
 
 	ws.on('message', function incoming(message) {
 		if (message.match('queue:')) {
@@ -168,14 +188,14 @@ wss.on('connection', function connection(ws, req) {
 			pty.on('data', function(data) {
 				ws.send(data, function(error) {
 					if (error)
-						console.log('error: web socket closed before the data was sent.' + error)
+						logger.info('error: web socket closed before the data was sent.' + error)
 				})
 			})
 			pty.on('exit', function(code, signal) {
 				if (signal == 9)
 					ws.send('Stopped.', function (error) {
 						if (error)
-							console.log('error: web socket closed before the exit code was sent.\n' + error)
+							logger.info('error: web socket closed before the exit code was sent.\n' + error)
 					})
 				// wait for the client to close the connection
 				//ws.terminate()
@@ -193,7 +213,7 @@ wss.on('connection', function connection(ws, req) {
 				//}
 			})
 			pty.on('exit', function(code, signal) {
-				//console.log('code: '+code+' signal: '+signal)
+				//logger.info('code: '+code+' signal: '+signal)
 				if (signal == 9)
 					ws.send('Stopped.')
 				pty = null
@@ -283,7 +303,7 @@ function serverExec(command) {
 			process.kill(pty.pid, 'SIGTERM')
 			pty = null
 		}catch (e) {
-			console.log(e)
+			logger.info(e)
 			// TODO
 		}
 	}
