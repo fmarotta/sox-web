@@ -84,7 +84,7 @@ class MusicPanel {
 				}
 			}
 			this.element.innerHTML = content;
-			
+
 			return i;
 		}).catch((error) => {
 			alert(error);

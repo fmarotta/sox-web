@@ -4,19 +4,19 @@
 // appropriate commands
 
 // Modules
-const bodyParser = require('/usr/lib/node_modules/body-parser')
+const bodyParser = require('./node_modules/body-parser')
 const child_process = require('child_process')
-const express = require('/usr/lib/node_modules/express')
+const express = require('./node_modules/express')
 const fs = require('fs')
 const http = require('http')
-const ip = require('/usr/lib/node_modules/ip')
-const Pty = require('/usr/lib/node_modules/node-pty')
-const WebSocket = require('/usr/lib/node_modules/ws')
-const winston = require('../node_modules/winston')
+const ip = require('./node_modules/ip')
+const Pty = require('./node_modules/node-pty')
+const WebSocket = require('./node_modules/ws')
+const winston = require('./node_modules/winston')
 
 // Config
 // TODO: config file
-const logFile = '/home/fmarotta/sox-web/log/server.log'
+const logFile = 'log/server.log'
 const baseMusicPath = '/mnt/media/music/'
 const serverIp = ip.address()
 const serverPort = 3001
@@ -119,7 +119,8 @@ app.post('/allMyMusic', function(req, res) {
 // volume {{{
 app.get('/volume', function(req, res) {
 	var volumePromise = new Promise(function(resolve, reject) {
-		var volume = child_process.exec('pactl list sinks | grep "Volume: front-left:" | awk \'{print ($3+$10)*100/131070}\'', function(error, stdout, stderr) {
+		// var volume = child_process.exec('pactl list sinks | grep "Volume: front-left:" | awk \'{print ($3+$10)*100/131070}\'', function(error, stdout, stderr) {
+		var volume = child_process.exec('amixer | grep "Mono: " | awk \'{print $3/4}\'', function(error, stdout, stderr) {
 			if (error)
 				reject(Error(error))
 			resolve(stdout)
@@ -133,7 +134,8 @@ app.get('/volume', function(req, res) {
 })
 
 app.post('/volume', function(req, res) {
-	var sinkvol = child_process.exec('pactl set-sink-volume @DEFAULT_SINK@ '+req.body.vol+'%', function(error, stdout, stderr) {
+	// var sinkvol = child_process.exec('pactl set-sink-volume @DEFAULT_SINK@ '+req.body.vol+'%', function(error, stdout, stderr) {
+	var sinkvol = child_process.exec('amixer set PCM '+req.body.vol+'%', function(error, stdout, stderr) {
 		if (error)
 			logger.info(error)
 		res.json(JSON.stringify('OK'))
